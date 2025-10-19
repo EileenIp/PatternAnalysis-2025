@@ -1,3 +1,4 @@
+# train.py
 import torch
 import torch.nn as nn
 from sklearn.metrics import accuracy_score
@@ -7,6 +8,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 from dataset import dataloader
 from modules import GCNModel
+
+def idx_accuracy(logits, y, idx):
+    pred = logits.argmax(dim=-1)[idx]
+    return accuracy_score(y[idx].cpu(), pred.cpu())
 
 def train_and_eval(model, data, train_idx, valid_idx, test_idx, *,
                    lr=0.01, wd=5e-4, epochs=300, step_size=50, gamma=0.5, device=None):
@@ -84,13 +89,9 @@ def train_and_eval(model, data, train_idx, valid_idx, test_idx, *,
     with torch.no_grad():
         logits = model(data)
         te_mask = data.y[test_idx] >= 0
-        pred = logits.argmax(dim=-1)[test_idx[te_mask]]
-        if te_mask.sum() > 0:
-            test_acc = accuracy_score(data.y[test_idx[te_mask]].cpu(), pred.cpu())
-        else:
-            test_acc = float('nan')
-
-    return test_acc, history
+        test_acc = idx_accuracy(logits, data.y, test_idx[te_mask]) if te_mask.sum() > 0 else float('nan')
+    
+    return test_acc, model, history
 
 def plot_training_curves(model_name, history):
     epochs = np.arange(1, len(history["train_loss"]) + 1)
@@ -118,18 +119,20 @@ def plot_training_curves(model_name, history):
     plt.tight_layout()
     plt.savefig(model_name + "_ACCURACY_TRAINING_CURVE.png", dpi=200)
 
+
 def run_model(edges_path, 
               target_path, 
               feats_path, 
-              seed=42
+              svd_components=256, 
+              seed=42, 
               ):
     torch.manual_seed(seed)
-    data, train_idx, valid_idx, test_idx, num_classes = dataloader(edges_path, target_path, feats_path, seed=seed)
+    data, train_idx, valid_idx, test_idx, num_classes = dataloader(edges_path, target_path, feats_path, svd_components=svd_components, seed=seed)
 
     in_dim = data.x.size(1)
     out_dim = num_classes
 
     gcn_acc, gcn_hist  = train_and_eval(GCNModel(in_dim, 64, out_dim, dropout=0.6), data, train_idx, valid_idx, test_idx)
-  
+
     print(f"GCN Test Accuracy: {gcn_acc:.4f}")
     plot_training_curves("GCN", gcn_hist)
