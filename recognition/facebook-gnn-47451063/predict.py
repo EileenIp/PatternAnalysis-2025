@@ -10,7 +10,9 @@ target_csv = data_dir / "musae_facebook_target.csv"
 feats_json = data_dir / "musae_facebook_features.json"
 
 SEED = 42
+SVD_COMPONENTS = 256   # reduce BoW features to this dim for speed+memory
 
 run_model(edges_csv, target_csv, feats_json, 
-          seed=SEED
+          svd_components=SVD_COMPONENTS, 
+          seed=SEED, 
           )
