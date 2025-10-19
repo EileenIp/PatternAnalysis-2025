@@ -1,4 +1,3 @@
-import json
 import numpy as np
 import pandas as pd
 import torch
@@ -15,9 +14,9 @@ def dataloader(edges_path, target_path, features_path, seed=42):
     id2idx = {int(nid): i for i, nid in enumerate(all_ids)}
     N = len(id2idx)
 
-    source = edges_df.iloc[:, 0].astype(np.int64).map(id2idx).to_numpy(np.int64, copy=False)
-    distance = edges_df.iloc[:, 1].astype(np.int64).map(id2idx).to_numpy(np.int64, copy=False)
-    edge_index = torch.from_numpy(np.vstack((source, distance)))
+    src = edges_df.iloc[:, 0].astype(np.int64).map(id2idx).to_numpy(np.int64, copy=False)
+    dst = edges_df.iloc[:, 1].astype(np.int64).map(id2idx).to_numpy(np.int64, copy=False)
+    edge_index = torch.from_numpy(np.vstack((src, dst)))
 
     nid_col = targets_df.columns[0]
     label_col = None
@@ -34,6 +33,7 @@ def dataloader(edges_path, target_path, features_path, seed=42):
 
     if label_col == nid_col:
         y = torch.full((N,), -1, dtype=torch.long)
+        num_classes = 0
     else:
         raw_y = targets_df[label_col]
         if raw_y.dtype == object:
@@ -47,8 +47,21 @@ def dataloader(edges_path, target_path, features_path, seed=42):
         y[torch.as_tensor(ids[mask].to_numpy(), dtype=torch.long)] = torch.as_tensor(
             y_series[mask].to_numpy(), dtype=torch.long
         )
+        if (y >= 0).any():
+            num_classes = int(y[y >= 0].max().item() + 1)
+        else:
+            num_classes = 0
 
     X = torch.eye(N, dtype=torch.float32)
+
     data = Data(x=X, edge_index=edge_index, y=y)
-    
-    return data
+
+    g = torch.Generator()
+    g.manual_seed(seed)
+    perm = torch.randperm(data.num_nodes, generator=g)
+    n = data.num_nodes
+    train_idx = perm[: int(0.8 * n)]
+    valid_idx = perm[int(0.8 * n): int(0.9 * n)]
+    test_idx = perm[int(0.9 * n):]
+
+    return data, train_idx, valid_idx, test_idx, num_classes
