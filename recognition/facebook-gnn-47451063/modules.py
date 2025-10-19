@@ -1,6 +1,6 @@
 import torch.nn as nn
 import torch.nn.functional as F
-from torch_geometric.nn import GCNConv, GATConv
+from torch_geometric.nn import GCNConv, GATConv, SAGEConv
 
 class GCNModel(nn.Module):
     def __init__(self, input_dim, hidden_dim, output_dim, dropout=0.6):
@@ -38,3 +38,18 @@ class GATModelBasic(nn.Module):
     def embed(self, data):
         x, edge_index = data.x, data.edge_index
         return F.elu(self.conv1(x, edge_index))
+    
+class GraphSAGE(nn.Module):
+    def __init__(self, input_dim, hidden_dim, output_dim, dropout=0.6):
+        super().__init__()
+        self.conv1 = SAGEConv(input_dim, hidden_dim, normalize=True)
+        self.conv2 = SAGEConv(hidden_dim, output_dim, normalize=True)
+        self.dropout = dropout
+
+    def forward(self, data):
+        x, edge_index = data.x, data.edge_index
+        hidden = F.dropout(x, p=self.dropout, training=self.training)
+        hidden = F.relu(self.conv1(hidden, edge_index))
+        hidden = F.dropout(hidden, p=self.dropout, training=self.training)
+        out = self.conv2(hidden, edge_index)
+        return out
