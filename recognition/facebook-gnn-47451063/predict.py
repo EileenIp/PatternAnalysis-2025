@@ -9,7 +9,9 @@ feats_json = data_dir / "musae_facebook_features.json"
 
 SEED = 42
 SVD_COMPONENTS = 256
-
+MAX_TSNE = 8000
+TSNE_PERPLEXITY = 30
+TSNE_ITER = 1000
 MAX_UMAP = 8000
 UMAP_N_NEIGHBORS = 15
 UMAP_MIN_DIST = 0.05
@@ -20,7 +22,10 @@ run_model(edges_csv, target_csv, feats_json,
           svd_components=SVD_COMPONENTS, 
           seed=SEED, 
           MAX_UMAP=MAX_UMAP,
+          MAX_TSNE=MAX_TSNE,
+          TSNE_PERPLEXITY=TSNE_PERPLEXITY,
           UMAP_N_NEIGHBORS=UMAP_N_NEIGHBORS,
+          TSNE_ITER=TSNE_ITER,
           UMAP_MIN_DIST=UMAP_MIN_DIST,
           UMAP_METRIC=UMAP_METRIC
           )
