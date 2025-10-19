@@ -8,7 +8,7 @@ import numpy as np
 from sklearn.manifold import TSNE
 import umap.umap_ as umap
 from dataset import dataloader
-from modules import GCNModel, GATModelBasic
+from modules import GCN, GAT, SAGE
 
 def idx_accuracy(logits, y, idx):
     pred = logits.argmax(dim=-1)[idx]
@@ -182,11 +182,12 @@ def run_model(edges_path,
     out_dim = num_classes
 
     results = {}
-    results["GCN"], gcn_model, gcn_hist  = train_and_eval(GCNModel(in_dim, 64, out_dim, dropout=0.6), data, train_idx, valid_idx, test_idx)
-    results["GAT"], gat_model, gat_hist  = train_and_eval(GATModelBasic(in_dim, 64, out_dim, dropout=0.6, heads=8), data, train_idx, valid_idx, test_idx, lr=0.005)
- 
+    results["GCN"], gcn_model, gcn_hist  = train_and_eval(GCN(in_dim, 64, out_dim, dropout=0.6), data, train_idx, valid_idx, test_idx)
+    results["GAT"], gat_model, gat_hist  = train_and_eval(GAT(in_dim, 64, out_dim, dropout=0.6, heads=8), data, train_idx, valid_idx, test_idx, lr=0.005)
+    results["SAGE"], sage_model, sage_hist  = train_and_eval(SAGE(in_dim, 64, out_dim, dropout=0.6), data, train_idx, valid_idx, test_idx)
+
     for name, acc in results.items():
-        print(f"{name} Test Accuracy: {acc:.4f}")
+        print(f"{name}: {acc}")
 
     show_tsne("GCN", gcn_model, data, max_points=MAX_TSNE, perplexity=TSNE_PERPLEXITY, n_iter=TSNE_ITER, seed=seed)
     show_umap("GCN", gcn_model, data, max_points=MAX_UMAP, UMAP_N_NEIGHBORS=UMAP_N_NEIGHBORS, UMAP_MIN_DIST=UMAP_MIN_DIST, UMAP_METRIC=UMAP_METRIC, seed=seed)
