@@ -2,7 +2,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.nn import GCNConv, GATConv, SAGEConv
 
-class GCNModel(nn.Module):
+class GCN(nn.Module):
     def __init__(self, input_dim, hidden_dim, output_dim, dropout=0.6):
         super().__init__()
         self.conv1 = GCNConv(input_dim, hidden_dim)
@@ -20,7 +20,7 @@ class GCNModel(nn.Module):
         x, edge_index = data.x, data.edge_index
         return F.relu(self.conv1(x, edge_index))
 
-class GATModelBasic(nn.Module):
+class GAT(nn.Module):
     def __init__(self, input_dim, hidden_dim, output_dim, dropout=0.6, heads=8):
         super().__init__()
         self.conv1 = GATConv(input_dim, hidden_dim, heads=heads, dropout=dropout, concat=True)
@@ -39,7 +39,7 @@ class GATModelBasic(nn.Module):
         x, edge_index = data.x, data.edge_index
         return F.elu(self.conv1(x, edge_index))
     
-class GraphSAGE(nn.Module):
+class SAGE(nn.Module):
     def __init__(self, input_dim, hidden_dim, output_dim, dropout=0.6):
         super().__init__()
         self.conv1 = SAGEConv(input_dim, hidden_dim, normalize=True)
