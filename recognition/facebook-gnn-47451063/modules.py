@@ -34,3 +34,7 @@ class GATModelBasic(nn.Module):
         hidden = F.dropout(hidden, p=self.dropout, training=self.training)
         out = self.conv2(hidden, edge_index)
         return out
+    
+    def embed(self, data):
+        x, ei = data.x, data.edge_index
+        return F.elu(self.conv1(x, ei))
