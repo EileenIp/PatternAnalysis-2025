@@ -197,4 +197,5 @@ def run_model(edges_path,
     show_umap("GAT", gat_model, data, max_points=MAX_UMAP, UMAP_N_NEIGHBORS=UMAP_N_NEIGHBORS, UMAP_MIN_DIST=UMAP_MIN_DIST, UMAP_METRIC=UMAP_METRIC, seed=seed)
     plot_training_curves("GAT", gat_hist)
 
+    show_umap("SAGE", sage_model, data, max_points=MAX_UMAP, UMAP_N_NEIGHBORS=UMAP_N_NEIGHBORS, UMAP_MIN_DIST=UMAP_MIN_DIST, UMAP_METRIC=UMAP_METRIC, seed=seed)
     plot_training_curves("SAGE", sage_hist)
