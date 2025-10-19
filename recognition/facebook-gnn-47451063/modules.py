@@ -15,3 +15,8 @@ class GCNModel(nn.Module):
         x = F.dropout(x, p=self.dropout, training=self.training)
         x = self.conv2(x, edge_index)
         return x
+    
+    def embed(self, data):
+        x, edge_index = data.x, data.edge_index
+        embedding = F.relu(self.conv1(x, edge_index))
+        return embedding
