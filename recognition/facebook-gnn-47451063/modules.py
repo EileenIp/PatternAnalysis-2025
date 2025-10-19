@@ -36,5 +36,5 @@ class GATModelBasic(nn.Module):
         return out
     
     def embed(self, data):
-        x, ei = data.x, data.edge_index
-        return F.elu(self.conv1(x, ei))
+        x, edge_index = data.x, data.edge_index
+        return F.elu(self.conv1(x, edge_index))
