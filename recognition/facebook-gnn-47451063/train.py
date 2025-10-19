@@ -9,7 +9,7 @@ import numpy as np
 from sklearn.manifold import TSNE
 import umap.umap_ as umap
 from dataset import dataloader
-from modules import GCNModel
+from modules import GCNModel, GATModelBasic, GraphSAGE
 
 def idx_accuracy(logits, y, idx):
     pred = logits.argmax(dim=-1)[idx]
@@ -40,6 +40,7 @@ def train_and_eval(model, data, train_idx, valid_idx, test_idx, *,
         opt.zero_grad()
         out = model(data)
         
+        # use only labeled nodes in the splits
         tr_mask = data.y[train_idx] >= 0
         loss = criterion(out[train_idx][tr_mask], data.y[train_idx][tr_mask])
         loss.backward()
@@ -50,11 +51,15 @@ def train_and_eval(model, data, train_idx, valid_idx, test_idx, *,
         model.eval()
         with torch.no_grad():
             logits = model(data)
+
+            # training metrics
             tr_logits = logits[train_idx][tr_mask]
             tr_labels = data.y[train_idx][tr_mask]
             train_pred = tr_logits.argmax(dim=-1)
             train_acc = (train_pred == tr_labels).float().mean().item()
             train_loss = loss.item()
+
+            # validation metrics
             va_mask = (data.y[valid_idx] >= 0)
             if va_mask.sum() > 0:
                 va_logits = logits[valid_idx][va_mask]
@@ -96,12 +101,14 @@ def show_tsne(model_name, model, data, max_points=800, seed=42, n_components=2, 
         emb = model.embed(data).detach().cpu().numpy()
         labels = data.y.detach().cpu().numpy()
 
+    # Subsample for speed if too large
     N = emb.shape[0]
     if max_points and N > max_points:
         idx = np.random.default_rng(seed).choice(N, size=max_points, replace=False)
         emb = emb[idx]
         labels = labels[idx]
 
+    # Filter to labeled only (optional but cleaner)
     keep = labels >= 0
     emb = emb[keep]
     labels = labels[keep]
@@ -109,11 +116,11 @@ def show_tsne(model_name, model, data, max_points=800, seed=42, n_components=2, 
     tsne = TSNE(n_components=n_components, random_state=seed, perplexity=perplexity, n_iter=n_iter, init=init, learning_rate=learning_rate)
     z = tsne.fit_transform(emb)
     plt.figure(figsize=(6,5))
-    plt.scatter(z[:,0], z[:,1], c=labels, s=3, cmap="tab10")
+    sc = plt.scatter(z[:,0], z[:,1], c=labels, s=3, cmap="tab10")
     plt.title(f"t-SNE — {model_name} embeddings")
     plt.xlabel("t-SNE-1"); plt.ylabel("t-SNE-2")
     plt.tight_layout()
-    plt.savefig(model_name + "_TSNE.png", dpi=200)
+    plt.savefig(model_name + "_TSNE.png", dpi=200)  # <-- as requested
 
 def show_umap(model_name, model, data, max_points=8000, seed=42, UMAP_N_NEIGHBORS=15, UMAP_MIN_DIST=0.05, UMAP_METRIC="cosine"):
     model.eval()
@@ -121,6 +128,7 @@ def show_umap(model_name, model, data, max_points=8000, seed=42, UMAP_N_NEIGHBOR
         emb = model.embed(data).detach().cpu().numpy()
         labels = data.y.detach().cpu().numpy()
 
+    # subsample for speed
     N = emb.shape[0]
     if max_points and N > max_points:
         idx = np.random.default_rng(seed).choice(N, size=max_points, replace=False)
@@ -153,6 +161,7 @@ def plot_training_curves(model_name, history):
     plt.tight_layout()
     plt.savefig(model_name + "_LOSS_TRAINING_CURVE.png", dpi=200)
 
+    # 2) Accuracy: train vs val
     plt.figure(figsize=(7,4.5))
     plt.plot(epochs, history["train_acc"], label="Train Acc")
     plt.plot(epochs, history["val_acc"],   label="Val Acc")
@@ -183,9 +192,14 @@ def run_model(edges_path,
     in_dim = data.x.size(1)
     out_dim = num_classes
 
-    gcn_acc, gcn_model, gcn_hist  = train_and_eval(GCNModel(in_dim, 64, out_dim, dropout=0.6), data, train_idx, valid_idx, test_idx)
-    
-    print(f"GCN Test Accuracy: {gcn_acc:.4f}")
+    results = {}
+    results["GCN"], gcn_model, gcn_hist  = train_and_eval(GCNModel(in_dim, 64, out_dim, dropout=0.6), data, train_idx, valid_idx, test_idx)
+    results["GAT"], gat_model, gat_hist  = train_and_eval(GATModelBasic(in_dim, 64, out_dim, dropout=0.6, heads=8), data, train_idx, valid_idx, test_idx, lr=0.005)
+    results["SAGE"], sage_model, sage_hist  = train_and_eval(GraphSAGE(in_dim, 64, out_dim, dropout=0.6), data, train_idx, valid_idx, test_idx)
+
+    for name, acc in results.items():
+        print(f"{name} Test Accuracy: {acc:.4f}")
+
     show_tsne("GCN", gcn_model, data, max_points=MAX_TSNE, perplexity=TSNE_PERPLEXITY, n_iter=TSNE_ITER, seed=seed)
     show_umap("GCN", gcn_model, data, max_points=MAX_UMAP, UMAP_N_NEIGHBORS=UMAP_N_NEIGHBORS, UMAP_MIN_DIST=UMAP_MIN_DIST, UMAP_METRIC=UMAP_METRIC, seed=seed)
     plot_training_curves("GCN", gcn_hist)
