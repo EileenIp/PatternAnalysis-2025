@@ -2,9 +2,12 @@ import json
 import numpy as np
 import pandas as pd
 import torch
+from sklearn.decomposition import TruncatedSVD
+from sklearn.preprocessing import normalize as sk_normalize
+import scipy.sparse as sp
 from torch_geometric.data import Data
 
-def dataloader(edges_path, target_path, features_path):
+def dataloader(edges_path, target_path, features_path, seed=42, svd_components=256):
     edges_df = pd.read_csv(edges_path)
     targets_df = pd.read_csv(target_path)
     with open(features_path, "r", encoding="utf-8") as f:
@@ -20,10 +23,9 @@ def dataloader(edges_path, target_path, features_path):
     src = edges_df.iloc[:,0].astype(np.int64).map(id2idx).to_numpy(np.int64, copy=False)
     dst = edges_df.iloc[:,1].astype(np.int64).map(id2idx).to_numpy(np.int64, copy=False)
     edge_index = torch.from_numpy(np.vstack((src, dst)))
-    edge_index = torch.cat([edge_index, edge_index.flip(0)], dim=1)  # make symmetric
+    edge_index = torch.cat([edge_index, edge_index.flip(0)], dim=1)
 
     nid_col = targets_df.columns[0]
-  
     label_col = None
     for c in targets_df.columns[1:]:
         if c.lower() in {"target","label","category","page_type"}:
@@ -42,7 +44,32 @@ def dataloader(edges_path, target_path, features_path):
     y[torch.as_tensor(ids[mask].to_numpy(), dtype=torch.long)] = torch.as_tensor(
         y_series[mask].to_numpy(), dtype=torch.long
     )
+    
     num_classes = int(y[y>=0].max().item() + 1)
+
+    rows, cols, vals = [], [], []
+    from collections import Counter
+    for nid_str, fidxs in feats_map.items():
+        idx = id2idx.get(int(nid_str))
+        if idx is None or not fidxs: continue
+        c = Counter(int(k) for k in fidxs)
+        for j, tf in c.items():
+            rows.append(idx); cols.append(j); vals.append(tf)
+    if len(rows) == 0:
+        X = torch.zeros((N, svd_components), dtype=torch.float32)
+    else:
+        rows = np.asarray(rows, np.int64); cols = np.asarray(cols, np.int64); vals = np.asarray(vals, np.float32)
+        Fdim = int(cols.max()) + 1
+        Xcnt = sp.coo_matrix((vals, (rows, cols)), shape=(N, Fdim), dtype=np.float32).tocsr()
+        df = (Xcnt > 0).sum(axis=0).A1
+        idf = np.log((1 + N) / (1 + df)) + 1.0
+        Xtfidf = Xcnt.multiply(idf)
+        Xtfidf = sk_normalize(Xtfidf, norm="l2", axis=1, copy=False)
+        k = min(svd_components, max(2, Xtfidf.shape[1]-1))
+        svd = TruncatedSVD(n_components=k, random_state=seed)
+        Xred = svd.fit_transform(Xtfidf)
+        Xred = sk_normalize(Xred, norm="l2", axis=1)
+        X = torch.from_numpy(Xred.astype(np.float32))
 
     data = Data(x=X, edge_index=edge_index, y=y)
 
