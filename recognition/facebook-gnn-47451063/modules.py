@@ -53,3 +53,7 @@ class GraphSAGE(nn.Module):
         hidden = F.dropout(hidden, p=self.dropout, training=self.training)
         out = self.conv2(hidden, edge_index)
         return out
+    
+    def embed(self, data):
+        x, edge_index = data.x, data.edge_index
+        return F.relu(self.conv1(x, edge_index))
