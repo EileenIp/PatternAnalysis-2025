@@ -16,6 +16,26 @@ def train(
         model: nn.Module, data, train_indices, val_indices, learning_rate: float = 0.01, weight_decay: float = 5e-4,
         epochs: int = 300, scheduler_step_size: int = 50, scheduler_gamma: float = 0.5, device=None, 
         grad_clip_max_norm: float = 2.0, patience: int = 80) -> Tuple[nn.Module, Dict[str, List[float]]]:
+    """
+    Train the GNN model with early stopping and return the best model and training history.
+
+    Args:
+        model (nn.Module): The GNN model to train.
+        data: The graph data.
+        train_indices: Indices of training nodes.
+        val_indices: Indices of validation nodes.
+        learning_rate (float): Learning rate for the optimiser.
+        weight_decay (float): Weight decay (L2 regularisation) for the optimiser.
+        epochs (int): Maximum number of training epochs.
+        scheduler_step_size (int): Step size for the learning rate scheduler.
+        scheduler_gamma (float): Multiplicative factor for learning rate decay.
+        device: Device to run the training on (CPU or GPU).
+        grad_clip_max_norm (float): Maximum norm for gradient clipping.
+        patience (int): Number of epochs to wait for improvement before early stopping.
+    
+    Returns:
+        Tuple[nn.Module, Dict[str, List[float]]]: The best model and training history.
+    """
     # Set device
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -25,18 +45,12 @@ def train(
     val_indices = val_indices.to(device)
 
     # Set optimiser, scheduler, loss
-    optimizer = AdamW(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
-    scheduler = StepLR(optimizer, step_size=scheduler_step_size, gamma=scheduler_gamma)
+    optimiser = AdamW(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+    scheduler = StepLR(optimiser, step_size=scheduler_step_size, gamma=scheduler_gamma)
     loss_fn = nn.CrossEntropyLoss()
 
     # Track history and best model
-    history = {
-        "train_loss": [],
-        "val_loss": [],
-        "train_acc": [],
-        "val_acc": [],
-        "lr": [],
-    }
+    history = {"train_loss": [], "val_loss": [], "train_acc": [], "val_acc": [], "lr": []}
     best_val_accuracy = -1.0
     best_state_dict = None
     remaining_patience = patience
@@ -44,14 +58,14 @@ def train(
     # Training loop
     for _ in range(epochs):
         model.train()
-        optimizer.zero_grad()
+        optimiser.zero_grad()
         logits = model(data)
 
         train_label_mask = data.y[train_indices] >= 0
         loss = loss_fn(logits[train_indices][train_label_mask], data.y[train_indices][train_label_mask])
         loss.backward()
         nn.utils.clip_grad_norm_(model.parameters(), grad_clip_max_norm)
-        optimizer.step()
+        optimiser.step()
         scheduler.step()
 
         model.eval()
@@ -77,7 +91,7 @@ def train(
         history["val_loss"].append(val_loss)
         history["train_acc"].append(train_accuracy)
         history["val_acc"].append(val_accuracy)
-        history["lr"].append(optimizer.param_groups[0]["lr"])
+        history["lr"].append(optimiser.param_groups[0]["lr"])
 
         # Early stopping check
         if val_accuracy > best_val_accuracy + 1e-4:
