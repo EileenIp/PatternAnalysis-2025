@@ -1,149 +1,206 @@
-import torch
-import torch.nn as nn
-from sklearn.metrics import accuracy_score
-from torch.optim import AdamW
-from torch.optim.lr_scheduler import StepLR
+# Import Libraries
 import matplotlib.pyplot as plt
 import numpy as np
-from sklearn.manifold import TSNE
+import torch
+import torch.nn as nn
 import umap.umap_ as umap
 from dataset import dataloader
 from modules import GCN, GAT, SAGE
+from sklearn.manifold import TSNE
+from sklearn.metrics import accuracy_score
+from torch.optim import AdamW
+from torch.optim.lr_scheduler import StepLR
+from typing import Dict, List, Tuple
 
-def idx_accuracy(logits, y, idx):
-    pred = logits.argmax(dim=-1)[idx]
-    return accuracy_score(y[idx].cpu(), pred.cpu())
-
-def train_and_eval(model, data, train_idx, valid_idx, test_idx,
-                   lr=0.01, wd=5e-4, epochs=300, step_size=50, gamma=0.5, device=None):
+def train(
+        model: nn.Module, data, train_indices, val_indices, learning_rate: float = 0.01, weight_decay: float = 5e-4,
+        epochs: int = 300, scheduler_step_size: int = 50, scheduler_gamma: float = 0.5, device=None, 
+        grad_clip_max_norm: float = 2.0, patience: int = 80) -> Tuple[nn.Module, Dict[str, List[float]]]:
+    # Set device
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
     model, data = model.to(device), data.to(device)
-    train_idx, valid_idx, test_idx = train_idx.to(device), valid_idx.to(device), test_idx.to(device)
+    train_indices = train_indices.to(device)
+    val_indices = val_indices.to(device)
 
-    opt = AdamW(model.parameters(), lr=lr, weight_decay=wd)
-    sched = StepLR(opt, step_size=step_size, gamma=gamma)
-    criterion = nn.CrossEntropyLoss()
+    # Set optimiser, scheduler, loss
+    optimizer = AdamW(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+    scheduler = StepLR(optimizer, step_size=scheduler_step_size, gamma=scheduler_gamma)
+    loss_fn = nn.CrossEntropyLoss()
 
+    # Track history and best model
     history = {
-    "train_loss": [], "val_loss": [],
-    "train_acc":  [], "val_acc":  [],
-    "lr": []
+        "train_loss": [],
+        "val_loss": [],
+        "train_acc": [],
+        "val_acc": [],
+        "lr": [],
     }
+    best_val_accuracy = -1.0
+    best_state_dict = None
+    remaining_patience = patience
 
-    best_val, best_state = -1.0, None
-    patience, left = 80, 80
-
+    # Training loop
     for _ in range(epochs):
         model.train()
-        opt.zero_grad()
-        out = model(data)
-        
-        tr_mask = data.y[train_idx] >= 0
-        loss = criterion(out[train_idx][tr_mask], data.y[train_idx][tr_mask])
+        optimizer.zero_grad()
+        logits = model(data)
+
+        train_label_mask = data.y[train_indices] >= 0
+        loss = loss_fn(logits[train_indices][train_label_mask], data.y[train_indices][train_label_mask])
         loss.backward()
-        nn.utils.clip_grad_norm_(model.parameters(), 2.0)
-        opt.step()
-        sched.step()
+        nn.utils.clip_grad_norm_(model.parameters(), grad_clip_max_norm)
+        optimizer.step()
+        scheduler.step()
 
         model.eval()
         with torch.no_grad():
             logits = model(data)
-            tr_logits = logits[train_idx][tr_mask]
-            tr_labels = data.y[train_idx][tr_mask]
-            train_pred = tr_logits.argmax(dim=-1)
-            train_acc = (train_pred == tr_labels).float().mean().item()
+            # Training metrics
+            train_logits = logits[train_indices][train_label_mask]
+            train_labels = data.y[train_indices][train_label_mask]
+            train_accuracy = (train_logits.argmax(dim=-1) == train_labels).float().mean().item()
             train_loss = loss.item()
-            va_mask = (data.y[valid_idx] >= 0)
-            if va_mask.sum() > 0:
-                va_logits = logits[valid_idx][va_mask]
-                va_labels = data.y[valid_idx][va_mask]
-                val_loss = criterion(va_logits, va_labels).item()
-                val_acc  = (va_logits.argmax(dim=-1) == va_labels).float().mean().item()
+            # Validation metrics
+            val_label_mask = (data.y[val_indices] >= 0)
+            if val_label_mask.sum() > 0:
+                val_logits = logits[val_indices][val_label_mask]
+                val_labels = data.y[val_indices][val_label_mask]
+                val_loss = loss_fn(val_logits, val_labels).item()
+                val_accuracy = (val_logits.argmax(dim=-1) == val_labels).float().mean().item()
             else:
-                val_loss, val_acc = float("nan"), 0.0
+                val_loss, val_accuracy = float("nan"), 0.0
 
+        # Record loss and accuracy metrics
         history["train_loss"].append(train_loss)
         history["val_loss"].append(val_loss)
-        history["train_acc"].append(train_acc)
-        history["val_acc"].append(val_acc)
-        history["lr"].append(opt.param_groups[0]["lr"])
+        history["train_acc"].append(train_accuracy)
+        history["val_acc"].append(val_accuracy)
+        history["lr"].append(optimizer.param_groups[0]["lr"])
 
-        if val_acc > best_val + 1e-4:
-            best_val = val_acc
-            best_state = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
-            left = patience
+        # Early stopping check
+        if val_accuracy > best_val_accuracy + 1e-4:
+            best_val_accuracy = val_accuracy
+            best_state_dict = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
+            remaining_patience = patience
         else:
-            left -= 1
-        if left <= 0:
+            remaining_patience -= 1
+
+        if remaining_patience <= 0:
             break
 
-    if best_state is not None:
-        model.load_state_dict(best_state)
+    if best_state_dict is not None:
+        model.load_state_dict(best_state_dict)
+
+    return model, history
+
+
+def evaluate(model: nn.Module, data, test_indices, device=None) -> float:
+    # Set device
+    if device is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    model, data = model.to(device), data.to(device)
+    test_indices = test_indices.to(device)
 
     model.eval()
     with torch.no_grad():
         logits = model(data)
-        te_mask = data.y[test_idx] >= 0
-        test_acc = idx_accuracy(logits, data.y, test_idx[te_mask]) if te_mask.sum() > 0 else float('nan')
-    
-    return test_acc, model, history
+        test_label_mask = data.y[test_indices] >= 0
+        
+        if test_label_mask.sum() == 0:
+            return float("nan")
 
-def show_tsne(model_name, model, data, max_points=800, seed=42, n_components=2, perplexity=30, n_iter=1000, init="pca", learning_rate="auto"):
+        # Calculate accuracy
+        predictions = logits.argmax(dim=-1)[test_indices[test_label_mask]]
+        test_accuracy = accuracy_score(data.y[test_indices[test_label_mask]].cpu(), predictions.cpu())
+
+    return test_accuracy
+
+
+def build_tsne(
+        model_name: str, model: nn.Module, data, max_points: int = 800, seed: int = 42, n_components: int = 2, 
+        perplexity: float = 30, n_iter: int = 1000, init: str = "pca", learning_rate="auto") -> None:
+    # Get embeddings and labels
     model.eval()
     with torch.no_grad():
-        emb = model.embed(data).detach().cpu().numpy()
+        embeddings = model.embed(data).detach().cpu().numpy()
         labels = data.y.detach().cpu().numpy()
 
-    N = emb.shape[0]
-    if max_points and N > max_points:
-        idx = np.random.default_rng(seed).choice(N, size=max_points, replace=False)
-        emb = emb[idx]
-        labels = labels[idx]
+    # Subsample if necessary
+    num_nodes = embeddings.shape[0]
+    if max_points and num_nodes > max_points:
+        sample_indices = np.random.default_rng(seed).choice(num_nodes, size=max_points, replace=False)
+        embeddings = embeddings[sample_indices]
+        labels = labels[sample_indices]
 
-    keep = labels >= 0
-    emb = emb[keep]
-    labels = labels[keep]
+    # Filter out unlabeled nodes
+    labeled_mask = labels >= 0
+    embeddings = embeddings[labeled_mask]
+    labels = labels[labeled_mask]
 
-    tsne = TSNE(n_components=n_components, random_state=seed, perplexity=perplexity, n_iter=n_iter, init=init, learning_rate=learning_rate)
-    z = tsne.fit_transform(emb)
-    plt.figure(figsize=(6,5))
-    sc = plt.scatter(z[:,0], z[:,1], c=labels, s=3, cmap="tab10")
+    # Bulid and fit t-SNE
+    tsne = TSNE(n_components=n_components,
+                random_state=seed,
+                perplexity=perplexity,
+                n_iter=n_iter,
+                init=init,
+                learning_rate=learning_rate
+                )
+    embedding_2d = tsne.fit_transform(embeddings)
+
+    # Plot and save t-SNE
+    plt.figure(figsize=(6, 5))
+    plt.scatter(embedding_2d[:, 0], embedding_2d[:, 1], c=labels, s=3, cmap="tab10")
     plt.title(f"t-SNE — {model_name} embeddings")
-    plt.xlabel("t-SNE-1"); plt.ylabel("t-SNE-2")
+    plt.xlabel("t-SNE-1")
+    plt.ylabel("t-SNE-2")
     plt.tight_layout()
     plt.savefig(model_name + "_TSNE.png", dpi=200)
 
-def show_umap(model_name, model, data, max_points=8000, seed=42, UMAP_N_NEIGHBORS=15, UMAP_MIN_DIST=0.05, UMAP_METRIC="cosine"):
+
+def build_umap(
+        model_name: str, model: nn.Module, data, max_points: int = 8000, seed: int = 42, umap_n_neighbors: int = 15,
+        umap_min_dist: float = 0.05, umap_metric: str = "cosine") -> None:
+    # Get embeddings and labels
     model.eval()
     with torch.no_grad():
-        emb = model.embed(data).detach().cpu().numpy()
+        embeddings = model.embed(data).detach().cpu().numpy()
         labels = data.y.detach().cpu().numpy()
 
-    N = emb.shape[0]
-    if max_points and N > max_points:
-        idx = np.random.default_rng(seed).choice(N, size=max_points, replace=False)
-        emb = emb[idx]; labels = labels[idx]
+    # Subsample if necessary
+    num_nodes = embeddings.shape[0]
+    if max_points and num_nodes > max_points:
+        sample_indices = np.random.default_rng(seed).choice(num_nodes, size=max_points, replace=False)
+        embeddings = embeddings[sample_indices]
+        labels = labels[sample_indices]
 
-    keep = labels >= 0
-    emb = emb[keep]; labels = labels[keep]
+    # Filter out unlabeled nodes
+    labeled_mask = labels >= 0
+    embeddings = embeddings[labeled_mask]
+    labels = labels[labeled_mask]
 
-    reducer = umap.UMAP(n_neighbors=UMAP_N_NEIGHBORS, min_dist=UMAP_MIN_DIST,
-                        metric=UMAP_METRIC, random_state=seed)
-    z = reducer.fit_transform(emb)
-    plt.figure(figsize=(6,5))
-    plt.scatter(z[:,0], z[:,1], c=labels, s=3, cmap="tab10")
+    # Build and fit UMAP
+    reducer = umap.UMAP(n_neighbors=umap_n_neighbors, min_dist=umap_min_dist, metric=umap_metric, random_state=seed)
+    embedding_2d = reducer.fit_transform(embeddings)
+
+    # Plot and save UMAP
+    plt.figure(figsize=(6, 5))
+    plt.scatter(embedding_2d[:, 0], embedding_2d[:, 1], c=labels, s=3, cmap="tab10")
     plt.title(f"UMAP — {model_name} embeddings")
-    plt.xlabel("UMAP-1"); plt.ylabel("UMAP-2")
+    plt.xlabel("UMAP-1")
+    plt.ylabel("UMAP-2")
     plt.tight_layout()
     plt.savefig(model_name + "_UMAP.png", dpi=200)
 
-def plot_training_curves(model_name, history):
-    epochs = np.arange(1, len(history["train_loss"]) + 1)
 
-    plt.figure(figsize=(7,4.5))
-    plt.plot(epochs, history["train_loss"], label="Train Loss")
-    plt.plot(epochs, history["val_loss"],   label="Val Loss")
+def build_training_curves(model_name: str, history: Dict[str, List[float]]):
+    epochs_axis = np.arange(1, len(history["train_loss"]) + 1)
+
+    plt.figure(figsize=(7, 4.5))
+    plt.plot(epochs_axis, history["train_loss"], label="Train Loss")
+    plt.plot(epochs_axis, history["val_loss"], label="Val Loss")
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
     plt.title(f"{model_name} — Loss")
@@ -151,9 +208,9 @@ def plot_training_curves(model_name, history):
     plt.tight_layout()
     plt.savefig(model_name + "_LOSS_TRAINING_CURVE.png", dpi=200)
 
-    plt.figure(figsize=(7,4.5))
-    plt.plot(epochs, history["train_acc"], label="Train Acc")
-    plt.plot(epochs, history["val_acc"],   label="Val Acc")
+    plt.figure(figsize=(7, 4.5))
+    plt.plot(epochs_axis, history["train_acc"], label="Train Acc")
+    plt.plot(epochs_axis, history["val_acc"], label="Val Acc")
     plt.xlabel("Epoch")
     plt.ylabel("Accuracy")
     plt.title(f"{model_name} — Accuracy")
@@ -162,41 +219,49 @@ def plot_training_curves(model_name, history):
     plt.tight_layout()
     plt.savefig(model_name + "_ACCURACY_TRAINING_CURVE.png", dpi=200)
 
-def run_model(edges_path, 
-              target_path, 
-              feats_path, 
-              svd_components=256, 
-              seed=42, 
-              MAX_UMAP=8000,
-              MAX_TSNE=8000,
-              TSNE_PERPLEXITY=30,
-              UMAP_N_NEIGHBORS=15,
-              TSNE_ITER=1000,
-              UMAP_MIN_DIST=0.05,
-              UMAP_METRIC="cosine"
-              ):
+
+def run_models(
+        edges_path: str, target_path: str, features_path: str, svd_components: int = 256, seed: int = 42, device=None,
+        max_umap_points: int = 8000, max_tsne_points: int = 8000, tsne_perplexity: int = 30, umap_n_neighbors: int = 15,
+        tsne_iterations: int = 1000, umap_min_dist: float = 0.05, umap_metric: str = "cosine") -> None:
     torch.manual_seed(seed)
-    data, train_idx, valid_idx, test_idx, num_classes = dataloader(edges_path, target_path, feats_path, svd_components=svd_components, seed=seed)
 
-    in_dim = data.x.size(1)
-    out_dim = num_classes
+    # Load data
+    data, train_indices, val_indices, test_indices, num_classes = dataloader(edges_path, target_path, features_path,
+                                                                             svd_components=svd_components, seed=seed)
 
-    results = {}
-    results["GCN"], gcn_model, gcn_hist  = train_and_eval(GCN(in_dim, 64, out_dim, dropout=0.6), data, train_idx, valid_idx, test_idx)
-    results["GAT"], gat_model, gat_hist  = train_and_eval(GAT(in_dim, 64, out_dim, dropout=0.6, heads=8), data, train_idx, valid_idx, test_idx, lr=0.005)
-    results["SAGE"], sage_model, sage_hist  = train_and_eval(SAGE(in_dim, 64, out_dim, dropout=0.6), data, train_idx, valid_idx, test_idx)
+    input_dim = data.x.size(1)
+    output_dim = num_classes
 
-    for name, acc in results.items():
-        print(f"{name}: {acc}")
+    # Define models to train
+    model_configs = [
+        ("GCN", lambda: GCN(input_dim, 64, output_dim, dropout=0.6), dict(learning_rate=0.01)),
+        ("GAT", lambda: GAT(input_dim, 64, output_dim, dropout=0.6, heads=8), dict(learning_rate=0.005)),
+        ("SAGE", lambda: SAGE(input_dim, 64, output_dim, dropout=0.6), dict(learning_rate=0.01)),
+    ]
 
-    show_tsne("GCN", gcn_model, data, max_points=MAX_TSNE, perplexity=TSNE_PERPLEXITY, n_iter=TSNE_ITER, seed=seed)
-    show_umap("GCN", gcn_model, data, max_points=MAX_UMAP, UMAP_N_NEIGHBORS=UMAP_N_NEIGHBORS, UMAP_MIN_DIST=UMAP_MIN_DIST, UMAP_METRIC=UMAP_METRIC, seed=seed)
-    plot_training_curves("GCN", gcn_hist)
-    
-    show_tsne("GAT", gat_model, data, max_points=MAX_TSNE, perplexity=TSNE_PERPLEXITY, n_iter=TSNE_ITER, seed=seed)
-    show_umap("GAT", gat_model, data, max_points=MAX_UMAP, UMAP_N_NEIGHBORS=UMAP_N_NEIGHBORS, UMAP_MIN_DIST=UMAP_MIN_DIST, UMAP_METRIC=UMAP_METRIC, seed=seed)
-    plot_training_curves("GAT", gat_hist)
+    results: Dict[str, float] = {}
+    trained_models: Dict[str, nn.Module] = {}
+    histories: Dict[str, Dict[str, List[float]]] = {}
 
-    show_tsne("SAGE", sage_model, data, max_points=MAX_TSNE, perplexity=TSNE_PERPLEXITY, n_iter=TSNE_ITER, seed=seed)
-    show_umap("SAGE", sage_model, data, max_points=MAX_UMAP, UMAP_N_NEIGHBORS=UMAP_N_NEIGHBORS, UMAP_MIN_DIST=UMAP_MIN_DIST, UMAP_METRIC=UMAP_METRIC, seed=seed)
-    plot_training_curves("SAGE", sage_hist)
+    for model_name, model_factory, hyperparams in model_configs:
+        # Train and get best model
+        model = model_factory()
+        model, history = train(model=model, data=data, train_indices=train_indices, val_indices=val_indices,
+                               learning_rate=hyperparams.get("learning_rate", 0.01), weight_decay=5e-4, epochs=300,
+                               scheduler_step_size=50, scheduler_gamma=0.5, device=device, patience=80)
+
+        # Evaluate the model
+        test_accuracy = evaluate(model, data, test_indices)
+        results[model_name] = test_accuracy
+        trained_models[model_name] = model
+        histories[model_name] = history
+
+        print(f"{model_name}: {test_accuracy}")
+
+        # Visualise results
+        build_tsne(model_name=model_name, model=model, data=data, max_points=max_tsne_points, perplexity=tsne_perplexity,
+                  n_iter=tsne_iterations, seed=seed)
+        build_umap(model_name=model_name, model=model, data=data, max_points=max_umap_points, 
+                   umap_n_neighbors=umap_n_neighbors, umap_min_dist=umap_min_dist, umap_metric=umap_metric, seed=seed)
+        build_training_curves(model_name, history)
