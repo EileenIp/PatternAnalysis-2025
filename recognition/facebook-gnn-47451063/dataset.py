@@ -82,6 +82,15 @@ def build_edge_index(edges_dataframe: pd.DataFrame, node_id_to_index: Dict[int, 
     return torch.cat([directed_edges, directed_edges.flip(0)], dim=1)
 
 def find_label_column(targets_dataframe: pd.DataFrame) -> str:
+    """
+    Identify the label column in the targets dataset.
+
+    Args:
+        targets_dataframe (pd.DataFrame): DataFrame containing target labels.
+
+    Returns:
+        str: Name of the label column.
+    """
     for column_name in targets_dataframe.columns[1:]:
         if column_name.lower() in {"target", "label", "category", "page_type"}:
             return column_name
