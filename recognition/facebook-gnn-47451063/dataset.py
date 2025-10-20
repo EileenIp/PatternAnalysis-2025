@@ -195,6 +195,17 @@ def apply_weights(count_matrix: sp.csr_matrix) -> sp.csr_matrix:
 
 
 def reduce_features(tfidf_matrix: sp.csr_matrix, svd_components: int, seed: int) -> np.ndarray:
+    """
+    Reduce dimensionality of TF-IDF features using Truncated SVD and normalise.
+
+    Args:
+        tfidf_matrix (sp.csr_matrix): Sparse matrix.
+        svd_components (int): Number of SVD components for reduction.
+        seed (int): Random seed for reproducibility.
+
+    Returns:
+        np.ndarray: Reduced and normalised feature matrix.
+    """
     n_components = min(svd_components, max(2, tfidf_matrix.shape[1] - 1))
 
     # Apply Truncated SVD
