@@ -285,6 +285,23 @@ def run_models(
         edges_path: str, target_path: str, features_path: str, svd_components: int = 256, seed: int = 42, device=None,
         max_umap_points: int = 8000, max_tsne_points: int = 8000, tsne_perplexity: int = 30, umap_n_neighbors: int = 15,
         tsne_iterations: int = 1000, umap_min_dist: float = 0.05, umap_metric: str = "cosine") -> None:
+    """
+    Run training, evaluation, and visualisation for multiple GNN models.
+
+    Args:
+        edges_path (str): Path to the edges CSV file.
+        target_path (str): Path to the target CSV file.
+        features_path (str): Path to the features JSON file.
+        svd_components (int): Number of SVD components for feature reduction.
+        seed (int): Random seed for reproducibility.
+        max_umap_points (int): Maximum number of points for UMAP visualisation.
+        max_tsne_points (int): Maximum number of points for t-SNE visualisation.
+        tsne_perplexity (int): Perplexity parameter for t-SNE.
+        umap_n_neighbors (int): Number of neighbors for UMAP.
+        tsne_iterations (int): Number of iterations for t-SNE.
+        umap_min_dist (float): Minimum distance parameter for UMAP.
+        umap_metric (str): Metric for UMAP.
+    """
     torch.manual_seed(seed)
 
     # Load data
