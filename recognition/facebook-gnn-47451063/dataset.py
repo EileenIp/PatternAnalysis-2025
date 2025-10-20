@@ -245,14 +245,24 @@ def build_features_tensor(
     return torch.from_numpy(reduced_features.astype(np.float32))
 
 
-def split_data(num_nodes: int, train_fraction: float = 0.8, val_fraction: float = 0.1) -> Tuple[Tensor, Tensor, Tensor]:
+def split_data(num_nodes: int, train_size: float = 0.8, val_size: float = 0.1) -> Tuple[Tensor, Tensor, Tensor]:
+    """
+    Split the nodes into training, validation, and test sets.
 
+    Args:
+        num_nodes (int): Total number of nodes.
+        train_size (float): Size of nodes to use for training.
+        val_size (float): Size of nodes to use for validation.
+
+    Returns:
+        Tuple[Tensor, Tensor, Tensor]: Tensors containing indices for training, validation, and test sets.
+    """
     # Generate a random permutation of node indices
     permutation_indices = torch.randperm(num_nodes)
-    num_train = int(train_fraction * num_nodes)
-    num_val = int(val_fraction * num_nodes)
+    num_train = int(train_size * num_nodes)
+    num_val = int(val_size * num_nodes)
 
-    # Split indices into train, val, test
+    # Split indices into train, val, test sets
     train_idx = permutation_indices[:num_train]
     valid_idx = permutation_indices[num_train : num_train + num_val]
     test_idx = permutation_indices[num_train + num_val :]
@@ -270,19 +280,19 @@ def dataloader(
     all_node_ids, node_id_to_index = collect_node_ids(edges_dataframe, targets_dataframe, features_map)
     num_nodes = len(all_node_ids)
 
-    # 3) Construct graph connectivity (undirected)
+    # 3) BUild edge index tensor
     edge_index = build_edge_index(edges_dataframe, node_id_to_index)
 
-    # 4) Build labels vector y and count classes
+    # 4) Build labels tensor and count number of classes
     y, num_classes = build_labels(targets_dataframe, node_id_to_index, num_nodes)
 
-    # 5) Build node feature matrix via TF-IDF weights and SVD feature reduction
+    # 5) Build features tensor with TF-IDF weighting and SVD feature reduction
     x = build_features_tensor(features_map, node_id_to_index, num_nodes, svd_components, seed)
 
     # 6) Create Data object
     data = Data(x=x, edge_index=edge_index, y=y)
 
     # 7) Create train/val/test splits
-    train_idx, valid_idx, test_idx = split_data(data.num_nodes, train_fraction=0.8, val_fraction=0.1)
+    train_idx, valid_idx, test_idx = split_data(data.num_nodes, train_size=0.8, val_size=0.1)
 
     return data, train_idx, valid_idx, test_idx, num_classes
