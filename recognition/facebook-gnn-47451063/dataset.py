@@ -273,26 +273,39 @@ def split_data(num_nodes: int, train_size: float = 0.8, val_size: float = 0.1) -
 def dataloader(
         edges_path: str, target_path: str, features_path: str, seed: int = 42, 
         svd_components: int = 256) -> Tuple[Data, Tensor, Tensor, Tensor, int]:
-    # 1) Load data files
+    """
+    Load and preprocess the dataset, returning a Data object and train/val/test splits.
+
+    Args:
+        edges_path (str): Path to the CSV file containing edge data.
+        target_path (str): Path to the CSV file containing target labels.
+        features_path (str): Path to the JSON file containing node features.
+        seed (int): Random seed for reproducibility.
+        svd_components (int): Number of SVD components for feature reduction.
+
+    Returns:
+        Tuple[Data, Tensor, Tensor, Tensor, int]: Data object, train, validation, test indices, and number of classes.
+    """
+    # Load data files
     edges_dataframe, targets_dataframe, features_map = load_data_files(edges_path, target_path, features_path)
 
-    # 2) Collect all unique node IDs and create universal mapping
+    # Collect all unique node IDs and create universal mapping
     all_node_ids, node_id_to_index = collect_node_ids(edges_dataframe, targets_dataframe, features_map)
     num_nodes = len(all_node_ids)
 
-    # 3) BUild edge index tensor
+    # Build edge index tensor
     edge_index = build_edge_index(edges_dataframe, node_id_to_index)
 
-    # 4) Build labels tensor and count number of classes
+    # Build labels tensor and count number of classes
     y, num_classes = build_labels(targets_dataframe, node_id_to_index, num_nodes)
 
-    # 5) Build features tensor with TF-IDF weighting and SVD feature reduction
+    # Build features tensor with TF-IDF weighting and SVD feature reduction
     x = build_features_tensor(features_map, node_id_to_index, num_nodes, svd_components, seed)
 
-    # 6) Create Data object
+    # Create Data object
     data = Data(x=x, edge_index=edge_index, y=y)
 
-    # 7) Create train/val/test splits
+    # Create train/val/test splits
     train_idx, valid_idx, test_idx = split_data(data.num_nodes, train_size=0.8, val_size=0.1)
 
     return data, train_idx, valid_idx, test_idx, num_classes
