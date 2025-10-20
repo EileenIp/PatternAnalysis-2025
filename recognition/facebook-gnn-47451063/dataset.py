@@ -137,7 +137,7 @@ def build_matrix(
 
     Args:
         features_map (Dict[str, Iterable[int]]): Dictionary mapping node IDs to their feature indices.
-        node_id_to_index (Dict[int, int]): Mapping from node ID to contiguous index.
+        node_id_to_index (Dict[int, int]): Dictionary mapping from node ID to contiguous index.
         num_nodes (int): Total number of nodes.
 
     Returns:
@@ -174,6 +174,15 @@ def build_matrix(
 
 
 def apply_weights(count_matrix: sp.csr_matrix) -> sp.csr_matrix:
+    """
+    Compute TF-IDF weighting and L2-normalise rows of the count matrix.
+
+    Args:
+        count_matrix (sp.csr_matrix): Sparse count matrix.
+
+    Returns:
+        sp.csr_matrix: TF-IDF weighted and L2-normalised sparse matrix.
+    """
     num_nodes = count_matrix.shape[0]
     
     # Compute TF-IDF weights
