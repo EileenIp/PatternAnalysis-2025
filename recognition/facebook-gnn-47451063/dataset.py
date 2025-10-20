@@ -143,9 +143,9 @@ def build_matrix(
     Returns:
         sp.csr_matrix: Sparse count matrix of shape (num_nodes, feature_dimension).
     """
-    row_indices: List[int] = []
-    col_indices: List[int] = []
-    values: List[float] = []
+    row_indices = []
+    col_indices = []
+    values = []
 
     # Create sparse matrix entries
     for node_id_str, feature_indices in features_map.items():
