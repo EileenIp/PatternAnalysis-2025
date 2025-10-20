@@ -204,6 +204,19 @@ def build_tsne(
 def build_umap(
         model_name: str, model: nn.Module, data, max_points: int = 8000, seed: int = 42, umap_n_neighbors: int = 15,
         umap_min_dist: float = 0.05, umap_metric: str = "cosine") -> None:
+    """
+    Generate and save UMAP plot of node embeddings.
+
+    Args:
+        model_name (str): Name of the model (for saving the plot).
+        model (nn.Module): The trained GNN model.
+        data: The graph data.
+        max_points (int): Maximum number of points to plot.
+        seed (int): Random seed for reproducibility.
+        umap_n_neighbors (int): Number of neighbors for UMAP.
+        umap_min_dist (float): Minimum distance parameter for UMAP.
+        umap_metric (str): Metric for UMAP.
+    """
     # Get embeddings and labels
     model.eval()
     with torch.no_grad():
