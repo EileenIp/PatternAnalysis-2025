@@ -218,6 +218,20 @@ def reduce_features(tfidf_matrix: sp.csr_matrix, svd_components: int, seed: int)
 def build_features_tensor(
         features_map: Dict[str, Iterable[int]], node_id_to_index: Dict[int, int], num_nodes: int, svd_components: int, 
         seed: int) -> Tensor:
+    """
+    Build the node features tensor via TF-IDF weighting and SVD reduction.
+
+    Args:
+        features_map (Dict[str, Iterable[int]]): Dictionary mapping node IDs to their feature indices.
+        node_id_to_index (Dict[int, int]): Dictionary mapping from node ID to contiguous index.
+        num_nodes (int): Total number of nodes.
+        svd_components (int): Number of SVD components for feature reduction.
+        seed (int): Random seed for reproducibility.
+
+    Returns:
+        Tensor: Node features tensor.
+    """
+    # Build the sparse count matrix
     count_matrix = build_matrix(features_map, node_id_to_index, num_nodes)
 
     # Handle edge case where there are no features
