@@ -111,6 +111,18 @@ def train(
 
 
 def evaluate(model: nn.Module, data, test_indices, device=None) -> float:
+    """
+    Evaluate the model on the test set and return accuracy.
+
+    Args:
+        model (nn.Module): The trained GNN model.
+        data: The graph data.
+        test_indices: Indices of test nodes.
+        device: Device to run the evaluation on (CPU or GPU).
+    
+    Returns:
+        float: Test accuracy.
+    """
     # Set device
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
