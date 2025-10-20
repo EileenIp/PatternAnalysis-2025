@@ -11,7 +11,7 @@ class GCN(nn.Module):
         Args:
             input_dim (int): Dimension of input features.
             hidden_dim (int): Dimension of hidden layer.
-            output_dim (int): Dimension of output layer (number of classes).
+            output_dim (int): Dimension of output layer.
             dropout (float): Dropout rate.
         """
         super().__init__()
@@ -62,7 +62,7 @@ class GAT(nn.Module):
         Args:
             input_dim (int): Dimension of input features.
             hidden_dim (int): Dimension of hidden layer.
-            output_dim (int): Dimension of output layer (number of classes).
+            output_dim (int): Dimension of output layer.
             dropout (float): Dropout rate.
             heads (int): Number of attention heads.
         """
@@ -79,7 +79,7 @@ class GAT(nn.Module):
 
         Args:
             data (Data): Input graph data.
-            
+
         Returns:
             Tensor: Output logits for each node.
         """
@@ -109,6 +109,15 @@ class GAT(nn.Module):
     
 class SAGE(nn.Module):
     def __init__(self, input_dim, hidden_dim, output_dim, dropout=0.6):
+        """
+        Initialise the SAGE model.
+
+        Args:
+            input_dim (int): Dimension of input features.
+            hidden_dim (int): Dimension of hidden layer.
+            output_dim (int): Dimension of output layer.
+            dropout (float): Dropout rate.
+        """
         super().__init__()
         # First layer maps to hidden representation
         self.conv1 = SAGEConv(input_dim, hidden_dim, normalize=True)
@@ -117,6 +126,15 @@ class SAGE(nn.Module):
         self.dropout = dropout
 
     def forward(self, data) -> torch.Tensor:
+        """
+        Forward pass of the SAGE model.
+        
+        Args:
+            data (Data): Input graph data.
+        
+        Returns:
+            Tensor: Output logits for each node.
+        """
         x, edge_index = data.x, data.edge_index
         # Apply dropout to input features
         hidden = F.dropout(x, p=self.dropout, training=self.training)
@@ -129,5 +147,14 @@ class SAGE(nn.Module):
         return out
     
     def embed(self, data) -> torch.Tensor:
+        """
+        Get the node embeddings from the first layer for plotting.
+
+        Args:
+            data (Data): Input graph data.
+
+        Returns:
+            Tensor: Node embeddings from the hidden layer.
+        """
         x, edge_index = data.x, data.edge_index
         return F.relu(self.conv1(x, edge_index))
