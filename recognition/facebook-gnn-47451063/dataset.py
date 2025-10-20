@@ -24,9 +24,7 @@ def load_data_files(
         features_path (str): Path to the JSON file containing node features.
     
     Returns:
-        edges_dataframe (pd.DataFrame): DataFrame containing edge data.
-        targets_dataframe (pd.DataFrame): DataFrame containing target labels.
-        features_map (Dict[str, List[int]]): Dictionary mapping node IDs to their feature indices.
+        Tuple[pd.DataFrame, pd.DataFrame, Dict[str, List[int]]]: DataFrames for edges and targets, and a dictionary for features.
     """
     edges_dataframe = pd.read_csv(edges_path)
     targets_dataframe = pd.read_csv(targets_path)
@@ -46,8 +44,7 @@ def collect_node_ids(
         features_map (Dict[str, Iterable[int]]): Dictionary mapping node IDs to their feature indices.
 
     Returns:
-        all_node_ids (List[int]): Sorted list of all unique node IDs.
-        node_id_to_index (Dict[int, int]): Mapping from node ID to adjacent index.
+        Tuple[List[int], Dict[int, int]]: A sorted list of all unique node IDs and a mapping from node ID to adjacent index.
     """
     # Extract node IDs from edges, targets, and features
     node_ids_from_edges = pd.unique(pd.concat([edges_dataframe.iloc[:, 0], edges_dataframe.iloc[:, 1]], axis=0))
@@ -97,6 +94,17 @@ def find_label_column(targets_dataframe: pd.DataFrame) -> str:
     return targets_dataframe.columns[1]
 
 def build_labels(targets_dataframe: pd.DataFrame, node_id_to_index: Dict[int, int], num_nodes: int) -> Tuple[Tensor, int]:
+    """
+    Build the labels tensor and count the number of classes.
+
+    Args:
+        targets_dataframe (pd.DataFrame): DataFrame containing target labels.
+        node_id_to_index (Dict[int, int]): Mapping from node ID to adjacent index.
+        num_nodes (int): Total number of nodes.
+
+    Returns:
+        Tuple[Tensor, int]: Labels tensor and number of classes.
+    """
     node_id_column = targets_dataframe.columns[0]
     label_column = find_label_column(targets_dataframe)
 
