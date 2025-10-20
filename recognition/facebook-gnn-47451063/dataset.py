@@ -37,6 +37,19 @@ def load_inputs(
 def collect_all_node_ids(
         edges_dataframe: pd.DataFrame, targets_dataframe: pd.DataFrame,
         features_map: Dict[str, Iterable[int]]) -> Tuple[List[int], Dict[int, int]]:
+    """
+    Build the universe of node ids by unioning ids from edges, targets, and features.
+    Create a stable mapping node_id -> contiguous index for tensor construction.
+
+    Args:
+        edges_dataframe (pd.DataFrame): DataFrame containing edge data.
+        targets_dataframe (pd.DataFrame): DataFrame containing target labels.
+        features_map (Dict[str, Iterable[int]]): Dictionary mapping node IDs to their feature indices.
+
+    Returns:
+        all_node_ids (List[int]): Sorted list of all unique node IDs.
+        node_id_to_index (Dict[int, int]): Mapping from node ID to contiguous index.
+    """
     # Extract node IDs from edges, targets, and features
     node_ids_from_edges = pd.unique(
         pd.concat([edges_dataframe.iloc[:, 0], edges_dataframe.iloc[:, 1]], axis=0)
@@ -100,7 +113,7 @@ def build_labels(targets_dataframe: pd.DataFrame, node_id_to_index: Dict[int, in
     
     return y, num_classes
 
-def build_count_matrix(
+def build_matrix(
         features_map: Dict[str, Iterable[int]], node_id_to_index: Dict[int, int], 
         num_nodes: int) -> sp.csr_matrix:
     row_indices: List[int] = []
@@ -150,7 +163,7 @@ def svd_reduce(tfidf_matrix: sp.csr_matrix, svd_components: int, seed: int) -> n
 def build_features_tensor(
         features_map: Dict[str, Iterable[int]], node_id_to_index: Dict[int, int], num_nodes: int, svd_components: int, 
         seed: int) -> Tensor:
-    count_matrix = build_count_matrix(features_map, node_id_to_index, num_nodes)
+    count_matrix = build_matrix(features_map, node_id_to_index, num_nodes)
 
     # Handle edge case where there are no features
     if count_matrix.shape[1] == 0:
@@ -163,7 +176,7 @@ def build_features_tensor(
     return torch.from_numpy(reduced_features.astype(np.float32))
 
 
-def random_splits(num_nodes: int, train_fraction: float = 0.8, val_fraction: float = 0.1) -> Tuple[Tensor, Tensor, Tensor]:
+def split_data(num_nodes: int, train_fraction: float = 0.8, val_fraction: float = 0.1) -> Tuple[Tensor, Tensor, Tensor]:
 
     # Generate a random permutation of node indices
     permutation_indices = torch.randperm(num_nodes)
@@ -201,6 +214,6 @@ def dataloader(
     data = Data(x=x, edge_index=edge_index, y=y)
 
     # 7) Create random train/val/test splits
-    train_idx, valid_idx, test_idx = random_splits(data.num_nodes, train_fraction=0.8, val_fraction=0.1)
+    train_idx, valid_idx, test_idx = split_data(data.num_nodes, train_fraction=0.8, val_fraction=0.1)
 
     return data, train_idx, valid_idx, test_idx, num_classes
