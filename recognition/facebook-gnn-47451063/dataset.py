@@ -63,7 +63,7 @@ def build_edge_index(edges_dataframe: pd.DataFrame, node_id_to_index: Dict[int, 
 
     Args:
         edges_dataframe (pd.DataFrame): DataFrame containing edge data.
-        node_id_to_index (Dict[int, int]): Mapping from node ID to adjacent index.
+        node_id_to_index (Dict[int, int]): Dictionary mapping from node ID to adjacent index.
 
     Returns:
         Tesnor: Edge index tensor.
@@ -99,7 +99,7 @@ def build_labels(targets_dataframe: pd.DataFrame, node_id_to_index: Dict[int, in
 
     Args:
         targets_dataframe (pd.DataFrame): DataFrame containing target labels.
-        node_id_to_index (Dict[int, int]): Mapping from node ID to adjacent index.
+        node_id_to_index (Dict[int, int]): Dictionary mapping from node ID to adjacent index.
         num_nodes (int): Total number of nodes.
 
     Returns:
@@ -132,6 +132,17 @@ def build_labels(targets_dataframe: pd.DataFrame, node_id_to_index: Dict[int, in
 def build_matrix(
         features_map: Dict[str, Iterable[int]], node_id_to_index: Dict[int, int], 
         num_nodes: int) -> sp.csr_matrix:
+    """
+    Build a sparse count matrix from the features map.
+
+    Args:
+        features_map (Dict[str, Iterable[int]]): Dictionary mapping node IDs to their feature indices.
+        node_id_to_index (Dict[int, int]): Mapping from node ID to contiguous index.
+        num_nodes (int): Total number of nodes.
+
+    Returns:
+        sp.csr_matrix: Sparse count matrix of shape (num_nodes, feature_dimension).
+    """
     row_indices: List[int] = []
     col_indices: List[int] = []
     values: List[float] = []
@@ -162,7 +173,7 @@ def build_matrix(
                          shape=(num_nodes, feature_dimension), dtype=np.float32).tocsr()
 
 
-def apply_weights(count_matrix: sp.csr_matrix) -> sp.csr_matrix: 
+def apply_weights(count_matrix: sp.csr_matrix) -> sp.csr_matrix:
     num_nodes = count_matrix.shape[0]
     
     # Compute TF-IDF weights
