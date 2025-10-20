@@ -15,6 +15,19 @@ from typing import Dict, Iterable, List, Tuple
 def load_inputs(
         edges_path: str, targets_path: str, 
         features_path: str) -> Tuple[pd.DataFrame, pd.DataFrame, Dict[str, List[int]]]:
+    """
+    Load the input data from the specified file paths.
+    
+    Args:
+        edges_path (str): Path to the CSV file containing edge data.
+        targets_path (str): Path to the CSV file containing target labels.
+        features_path (str): Path to the JSON file containing node features.
+    
+    Returns:
+        edges_dataframe (pd.DataFrame): DataFrame containing edge data.
+        targets_dataframe (pd.DataFrame): DataFrame containing target labels.
+        features_map (Dict[str, List[int]]): Dictionary mapping node IDs to their feature indices.
+    """
     edges_dataframe = pd.read_csv(edges_path)
     targets_dataframe = pd.read_csv(targets_path)
     with open(features_path, "r", encoding="utf-8") as f:
