@@ -152,7 +152,7 @@ def build_tsne(
     Generate and save t-SNE plot of node embeddings.
 
     Args:
-        model_name (str): Name of the model (for saving the plot).
+        model_name (str): Name of the model.
         model (nn.Module): The trained GNN model.
         data: The graph data.
         max_points (int): Maximum number of points to plot.
@@ -208,7 +208,7 @@ def build_umap(
     Generate and save UMAP plot of node embeddings.
 
     Args:
-        model_name (str): Name of the model (for saving the plot).
+        model_name (str): Name of the model.
         model (nn.Module): The trained GNN model.
         data: The graph data.
         max_points (int): Maximum number of points to plot.
@@ -250,6 +250,13 @@ def build_umap(
 
 
 def build_training_curves(model_name: str, history: Dict[str, List[float]]):
+    """
+    Plot and save training curves for loss and accuracy.
+
+    Args:
+        model_name (str): Name of the model.
+        history (Dict[str, List[float]]): Training history containing loss and accuracy.
+    """
     epochs_axis = np.arange(1, len(history["train_loss"]) + 1)
 
     plt.figure(figsize=(7, 4.5))
