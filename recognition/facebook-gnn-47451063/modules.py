@@ -5,6 +5,15 @@ from torch_geometric.nn import GCNConv, GATConv, SAGEConv
 
 class GCN(nn.Module):
     def __init__(self, input_dim, hidden_dim, output_dim, dropout=0.6):
+        """
+        Initialise the GCN model.
+        
+        Args:
+            input_dim (int): Dimension of input features.
+            hidden_dim (int): Dimension of hidden layer.
+            output_dim (int): Dimension of output layer (number of classes).
+            dropout (float): Dropout rate.
+        """
         super().__init__()
         # First graph convolution layer maps input features to hidden representation
         self.conv1 = GCNConv(input_dim, hidden_dim)
@@ -14,6 +23,15 @@ class GCN(nn.Module):
         self.dropout = dropout
 
     def forward(self, data) -> torch.Tensor:
+        """
+        Forward pass of the GCN model.
+        
+        Args:
+            data (Data): Input graph data.
+            
+        Returns:
+            Tensor: Output logits for each node.
+        """
         x, edge_index = data.x, data.edge_index
         # First GCN layer with nonlinearity
         hidden = F.relu(self.conv1(x, edge_index))
@@ -24,6 +42,9 @@ class GCN(nn.Module):
         return out
     
     def embed(self, data) -> torch.Tensor:
+        """
+        Get the node embeddings from the first layer for plotting.
+        """
         x, edge_index = data.x, data.edge_index
         return F.relu(self.conv1(x, edge_index))
 
