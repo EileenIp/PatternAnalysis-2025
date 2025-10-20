@@ -148,6 +148,21 @@ def evaluate(model: nn.Module, data, test_indices, device=None) -> float:
 def build_tsne(
         model_name: str, model: nn.Module, data, max_points: int = 800, seed: int = 42, n_components: int = 2, 
         perplexity: float = 30, n_iter: int = 1000, init: str = "pca", learning_rate="auto") -> None:
+    """
+    Generate and save t-SNE plot of node embeddings.
+
+    Args:
+        model_name (str): Name of the model (for saving the plot).
+        model (nn.Module): The trained GNN model.
+        data: The graph data.
+        max_points (int): Maximum number of points to plot.
+        seed (int): Random seed for reproducibility.
+        n_components (int): Number of t-SNE components.
+        perplexity (float): t-SNE perplexity parameter.
+        n_iter (int): Number of t-SNE iterations.
+        init (str): Initialization method for t-SNE.
+        learning_rate (str or float): Learning rate for t-SNE.
+    """
     # Get embeddings and labels
     model.eval()
     with torch.no_grad():
