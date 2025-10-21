@@ -12,6 +12,9 @@ from torch.optim import AdamW
 from torch.optim.lr_scheduler import StepLR
 from typing import Dict, List, Tuple
 
+import os
+from datetime import datetime
+
 def train(
         model: nn.Module, data, train_indices, val_indices, learning_rate: float = 0.01, weight_decay: float = 5e-4,
         epochs: int = 300, scheduler_step_size: int = 50, scheduler_gamma: float = 0.5, device=None, 
@@ -57,13 +60,16 @@ def train(
 
     # Training loop
     for _ in range(epochs):
+        # Training step
         model.train()
+        # Reset gradients
         optimiser.zero_grad()
+        # Get logits and compute loss
         logits = model(data)
-
         train_label_mask = data.y[train_indices] >= 0
         loss = loss_fn(logits[train_indices][train_label_mask], data.y[train_indices][train_label_mask])
         loss.backward()
+        # Clip gradients to prevent exploding gradients
         nn.utils.clip_grad_norm_(model.parameters(), grad_clip_max_norm)
         optimiser.step()
         scheduler.step()
@@ -71,14 +77,18 @@ def train(
         model.eval()
         with torch.no_grad():
             logits = model(data)
-            # Training metrics
+
+            # Get training metrics
             train_logits = logits[train_indices][train_label_mask]
             train_labels = data.y[train_indices][train_label_mask]
             train_accuracy = (train_logits.argmax(dim=-1) == train_labels).float().mean().item()
             train_loss = loss.item()
-            # Validation metrics
+            
+            # Get validation metrics
             val_label_mask = (data.y[val_indices] >= 0)
-            if val_label_mask.sum() > 0:
+
+            # Ensure there are labeled validation nodes
+            if val_label_mask.sum() > 0: 
                 val_logits = logits[val_indices][val_label_mask]
                 val_labels = data.y[val_indices][val_label_mask]
                 val_loss = loss_fn(val_logits, val_labels).item()
@@ -93,14 +103,15 @@ def train(
         history["val_acc"].append(val_accuracy)
         history["lr"].append(optimiser.param_groups[0]["lr"])
 
-        # Early stopping check
+        # Early stopping check to save best model
         if val_accuracy > best_val_accuracy + 1e-4:
             best_val_accuracy = val_accuracy
             best_state_dict = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
             remaining_patience = patience
         else:
             remaining_patience -= 1
-
+ 
+        # Stop training if no improvement within patience
         if remaining_patience <= 0:
             break
 
@@ -108,7 +119,6 @@ def train(
         model.load_state_dict(best_state_dict)
 
     return model, history
-
 
 def evaluate(model: nn.Module, data, test_indices, device=None) -> float:
     """
@@ -144,10 +154,10 @@ def evaluate(model: nn.Module, data, test_indices, device=None) -> float:
 
     return test_accuracy
 
-
 def build_tsne(
         model_name: str, model: nn.Module, data, max_points: int = 800, seed: int = 42, n_components: int = 2, 
-        perplexity: float = 30, n_iter: int = 1000, init: str = "pca", learning_rate="auto") -> None:
+        perplexity: float = 30, n_iter: int = 1000, init: str = "pca", learning_rate="auto", 
+        base_folder: str = "facebook-gnn-47451063") -> None:
     """
     Generate and save t-SNE plot of node embeddings.
 
@@ -162,7 +172,12 @@ def build_tsne(
         n_iter (int): Number of t-SNE iterations.
         init (str): Initialization method for t-SNE.
         learning_rate (str or float): Learning rate for t-SNE.
+        base_folder (str): Base folder where the plots folder is located.
     """
+    # Create plots directory if it doesn't exist
+    plots_folder = os.path.join(base_folder, "plots")
+    os.makedirs(plots_folder, exist_ok=True)
+
     # Get embeddings and labels
     model.eval()
     with torch.no_grad():
@@ -182,28 +197,22 @@ def build_tsne(
     labels = labels[labeled_mask]
 
     # Bulid and fit t-SNE
-    tsne = TSNE(n_components=n_components,
-                random_state=seed,
-                perplexity=perplexity,
-                n_iter=n_iter,
-                init=init,
-                learning_rate=learning_rate
-                )
-    embedding_2d = tsne.fit_transform(embeddings)
+    built_tsne = TSNE(n_components=n_components, random_state=seed, perplexity=perplexity, n_iter=n_iter, init=init, 
+                learning_rate=learning_rate)
+    tsne_plot = built_tsne.fit_transform(embeddings)
 
     # Plot and save t-SNE
     plt.figure(figsize=(6, 5))
-    plt.scatter(embedding_2d[:, 0], embedding_2d[:, 1], c=labels, s=3, cmap="tab10")
-    plt.title(f"t-SNE — {model_name} embeddings")
+    plt.scatter(tsne_plot[:, 0], tsne_plot[:, 1], c=labels, s=3, cmap="tab10")
+    plt.title(f"t-SNE of {model_name} Embeddings")
     plt.xlabel("t-SNE-1")
     plt.ylabel("t-SNE-2")
     plt.tight_layout()
-    plt.savefig(model_name + "_TSNE.png", dpi=200)
-
+    plt.savefig(os.path.join(plots_folder, f"{model_name}_TSNE.png"), dpi=200)
 
 def build_umap(
         model_name: str, model: nn.Module, data, max_points: int = 8000, seed: int = 42, umap_n_neighbors: int = 15,
-        umap_min_dist: float = 0.05, umap_metric: str = "cosine") -> None:
+        umap_min_dist: float = 0.05, umap_metric: str = "cosine", base_folder: str = "facebook-gnn-47451063") -> None:
     """
     Generate and save UMAP plot of node embeddings.
 
@@ -216,7 +225,12 @@ def build_umap(
         umap_n_neighbors (int): Number of neighbors for UMAP.
         umap_min_dist (float): Minimum distance parameter for UMAP.
         umap_metric (str): Metric for UMAP.
+        base_folder (str): Base folder where the plots folder is located.
     """
+    # Create plots folder if it doesn't exist
+    plots_folder = os.path.join(base_folder, "plots")
+    os.makedirs(plots_folder, exist_ok=True)
+
     # Get embeddings and labels
     model.eval()
     with torch.no_grad():
@@ -236,29 +250,34 @@ def build_umap(
     labels = labels[labeled_mask]
 
     # Build and fit UMAP
-    reducer = umap.UMAP(n_neighbors=umap_n_neighbors, min_dist=umap_min_dist, metric=umap_metric, random_state=seed)
-    embedding_2d = reducer.fit_transform(embeddings)
+    built_umap = umap.UMAP(n_neighbors=umap_n_neighbors, min_dist=umap_min_dist, metric=umap_metric, random_state=seed)
+    umap_plot = built_umap.fit_transform(embeddings)
 
     # Plot and save UMAP
     plt.figure(figsize=(6, 5))
-    plt.scatter(embedding_2d[:, 0], embedding_2d[:, 1], c=labels, s=3, cmap="tab10")
-    plt.title(f"UMAP — {model_name} embeddings")
+    plt.scatter(umap_plot[:, 0], umap_plot[:, 1], c=labels, s=3, cmap="tab10")
+    plt.title(f"UMAP of {model_name} Embeddings")
     plt.xlabel("UMAP-1")
     plt.ylabel("UMAP-2")
     plt.tight_layout()
-    plt.savefig(model_name + "_UMAP.png", dpi=200)
+    plt.savefig(os.path.join(plots_folder, f"{model_name}_UMAP.png"), dpi=200)
 
 
-def build_training_curves(model_name: str, history: Dict[str, List[float]]):
+def build_training_curves(model_name: str, history: Dict[str, List[float]], base_folder: str = "facebook-gnn-47451063") -> None:
     """
     Plot and save training curves for loss and accuracy.
 
     Args:
         model_name (str): Name of the model.
         history (Dict[str, List[float]]): Training history containing loss and accuracy.
+        base_folder (str): Base folder where the plots folder is located.
     """
+    # Create plots folder if it doesn't exist
+    plots_folder = os.path.join(base_folder, "plots")
+    os.makedirs(plots_folder, exist_ok=True)
     epochs_axis = np.arange(1, len(history["train_loss"]) + 1)
 
+    # Plot and save training curves for train and validation loss
     plt.figure(figsize=(7, 4.5))
     plt.plot(epochs_axis, history["train_loss"], label="Train Loss")
     plt.plot(epochs_axis, history["val_loss"], label="Val Loss")
@@ -267,8 +286,9 @@ def build_training_curves(model_name: str, history: Dict[str, List[float]]):
     plt.title(f"{model_name} — Loss")
     plt.legend()
     plt.tight_layout()
-    plt.savefig(model_name + "_LOSS_TRAINING_CURVE.png", dpi=200)
+    plt.savefig(os.path.join(plots_folder, f"{model_name}_LOSS_TRAINING_CURVE.png"), dpi=200)
 
+    # Plot and save training curves for train and validation accuracy
     plt.figure(figsize=(7, 4.5))
     plt.plot(epochs_axis, history["train_acc"], label="Train Acc")
     plt.plot(epochs_axis, history["val_acc"], label="Val Acc")
@@ -278,13 +298,31 @@ def build_training_curves(model_name: str, history: Dict[str, List[float]]):
     plt.ylim(0, 1.0)
     plt.legend()
     plt.tight_layout()
-    plt.savefig(model_name + "_ACCURACY_TRAINING_CURVE.png", dpi=200)
+    plt.savefig(os.path.join(plots_folder, f"{model_name}_ACCURACY_TRAINING_CURVE.png"), dpi=200)
 
+def save_model(model: nn.Module, model_name: str, base_folder: str = "facebook-gnn-47451063") -> None:
+    """
+    Save a trained model to the specified folder inside the project.
 
-def run_models(
+    Args:
+        model (nn.Module): The trained model to save.
+        model_name (str): Name of the model.
+        base_folder (str): Base directory where the models folder is located.
+    """
+    # Create models directory if it doesn't exist
+    models_dir = os.path.join(base_folder, "models")
+    os.makedirs(models_dir, exist_ok=True)
+    model_path = os.path.join(models_dir, f"{model_name}.pt")
+
+    # Save model state dict
+    torch.save(model.state_dict(), model_path)
+    print(f"Model '{model_name}' saved to: {model_path}")
+
+def run_model(
         edges_path: str, target_path: str, features_path: str, svd_components: int = 256, seed: int = 42, device=None,
         max_umap_points: int = 8000, max_tsne_points: int = 8000, tsne_perplexity: int = 30, umap_n_neighbors: int = 15,
-        tsne_iterations: int = 1000, umap_min_dist: float = 0.05, umap_metric: str = "cosine") -> None:
+        tsne_iterations: int = 1000, umap_min_dist: float = 0.05, umap_metric: str = "cosine", 
+        base_folder: str = "facebook-gnn-47451063") -> None:
     """
     Run training, evaluation, and visualisation for multiple GNN models.
 
@@ -311,7 +349,7 @@ def run_models(
     input_dim = data.x.size(1)
     output_dim = num_classes
 
-    # Define models to train
+    # The models selected to train
     model_configs = [
         ("GCN", lambda: GCN(input_dim, 64, output_dim, dropout=0.6), dict(learning_rate=0.01)),
         ("GAT", lambda: GAT(input_dim, 64, output_dim, dropout=0.6, heads=8), dict(learning_rate=0.005)),
@@ -335,11 +373,15 @@ def run_models(
         trained_models[model_name] = model
         histories[model_name] = history
 
-        print(f"{model_name}: {test_accuracy}")
+        print(f"{model_name}: {test_accuracy:.4f}")
 
         # Visualise results
         build_tsne(model_name=model_name, model=model, data=data, max_points=max_tsne_points, perplexity=tsne_perplexity,
-                  n_iter=tsne_iterations, seed=seed)
+                  n_iter=tsne_iterations, seed=seed, base_folder=base_folder)
         build_umap(model_name=model_name, model=model, data=data, max_points=max_umap_points, 
-                   umap_n_neighbors=umap_n_neighbors, umap_min_dist=umap_min_dist, umap_metric=umap_metric, seed=seed)
-        build_training_curves(model_name, history)
+                   umap_n_neighbors=umap_n_neighbors, umap_min_dist=umap_min_dist, umap_metric=umap_metric, seed=seed,
+                   base_folder=base_folder)
+        build_training_curves(model_name, history, base_folder=base_folder)
+
+        # Save the trained model
+        save_model(model=model, model_name=model_name, base_folder=base_folder)
