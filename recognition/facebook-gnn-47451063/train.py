@@ -204,11 +204,11 @@ def build_tsne(
     # Plot and save t-SNE
     plt.figure(figsize=(6, 5))
     plt.scatter(tsne_plot[:, 0], tsne_plot[:, 1], c=labels, s=3, cmap="tab10")
-    plt.title(f"t-SNE of {model_name} Embeddings")
+    plt.title(f"t-SNE of {model_name} Embeddings Plot")
     plt.xlabel("t-SNE-1")
     plt.ylabel("t-SNE-2")
     plt.tight_layout()
-    plt.savefig(os.path.join(plots_folder, f"{model_name}_TSNE.png"), dpi=200)
+    plt.savefig(os.path.join(plots_folder, f"{model_name}_TSNE_PLOT.png"), dpi=200)
 
 def build_umap(
         model_name: str, model: nn.Module, data, max_points: int = 8000, seed: int = 42, umap_n_neighbors: int = 15,
@@ -256,20 +256,20 @@ def build_umap(
     # Plot and save UMAP
     plt.figure(figsize=(6, 5))
     plt.scatter(umap_plot[:, 0], umap_plot[:, 1], c=labels, s=3, cmap="tab10")
-    plt.title(f"UMAP of {model_name} Embeddings")
+    plt.title(f"UMAP of {model_name} Embeddings Plot")
     plt.xlabel("UMAP-1")
     plt.ylabel("UMAP-2")
     plt.tight_layout()
-    plt.savefig(os.path.join(plots_folder, f"{model_name}_UMAP.png"), dpi=200)
+    plt.savefig(os.path.join(plots_folder, f"{model_name}_UMAP_PLOT.png"), dpi=200)
 
 
-def build_training_curves(model_name: str, history: Dict[str, List[float]], base_folder: str = "facebook-gnn-47451063") -> None:
+def build_curves(model_name: str, history: Dict[str, List[float]], base_folder: str = "facebook-gnn-47451063") -> None:
     """
-    Plot and save training curves for loss and accuracy.
+    Plot and save training/validation curves for loss and accuracy.
 
     Args:
         model_name (str): Name of the model.
-        history (Dict[str, List[float]]): Training history containing loss and accuracy.
+        history (Dict[str, List[float]]): Training/validation history containing loss and accuracy.
         base_folder (str): Base folder where the plots folder is located.
     """
     # Create plots folder if it doesn't exist
@@ -283,10 +283,10 @@ def build_training_curves(model_name: str, history: Dict[str, List[float]], base
     plt.plot(epochs_axis, history["val_loss"], label="Val Loss")
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
-    plt.title(f"{model_name} — Loss")
+    plt.title(f"{model_name} Training and Validation Loss Plot")
     plt.legend()
     plt.tight_layout()
-    plt.savefig(os.path.join(plots_folder, f"{model_name}_LOSS_TRAINING_CURVE.png"), dpi=200)
+    plt.savefig(os.path.join(plots_folder, f"{model_name}_LOSS_PLOT.png"), dpi=200)
 
     # Plot and save training curves for train and validation accuracy
     plt.figure(figsize=(7, 4.5))
@@ -294,11 +294,11 @@ def build_training_curves(model_name: str, history: Dict[str, List[float]], base
     plt.plot(epochs_axis, history["val_acc"], label="Val Acc")
     plt.xlabel("Epoch")
     plt.ylabel("Accuracy")
-    plt.title(f"{model_name} — Accuracy")
+    plt.title(f"{model_name} Training and Validation Accuracy Plot")
     plt.ylim(0, 1.0)
     plt.legend()
     plt.tight_layout()
-    plt.savefig(os.path.join(plots_folder, f"{model_name}_ACCURACY_TRAINING_CURVE.png"), dpi=200)
+    plt.savefig(os.path.join(plots_folder, f"{model_name}_ACCURACY_PLOT.png"), dpi=200)
 
 def save_model(model: nn.Module, model_name: str, base_folder: str = "facebook-gnn-47451063") -> None:
     """
@@ -373,7 +373,7 @@ def run_model(
         trained_models[model_name] = model
         histories[model_name] = history
 
-        print(f"{model_name}: {test_accuracy:.4f}")
+        print(f"{model_name}'s Test Accuracy: {test_accuracy*100:.3f}%")
 
         # Visualise results
         build_tsne(model_name=model_name, model=model, data=data, max_points=max_tsne_points, perplexity=tsne_perplexity,
@@ -381,7 +381,7 @@ def run_model(
         build_umap(model_name=model_name, model=model, data=data, max_points=max_umap_points, 
                    umap_n_neighbors=umap_n_neighbors, umap_min_dist=umap_min_dist, umap_metric=umap_metric, seed=seed,
                    base_folder=base_folder)
-        build_training_curves(model_name, history, base_folder=base_folder)
+        build_curves(model_name, history, base_folder=base_folder)
 
         # Save the trained model
         save_model(model=model, model_name=model_name, base_folder=base_folder)
