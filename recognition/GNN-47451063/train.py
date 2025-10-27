@@ -160,7 +160,7 @@ def evaluate(model: nn.Module, data, test_indices, device=None) -> float:
 def build_tsne(
         model_name: str, model: nn.Module, data, max_points: int = 800, seed: int = 42, n_components: int = 2, 
         perplexity: float = 30, n_iter: int = 1000, init: str = "pca", learning_rate="auto", 
-        base_folder: str = "facebook-gnn-47451063") -> None:
+        base_folder: str = "GNN-47451063") -> None:
     """
     Generate and save t-SNE plot of node embeddings.
 
@@ -216,7 +216,7 @@ def build_tsne(
 
 def build_umap(
         model_name: str, model: nn.Module, data, max_points: int = 8000, seed: int = 42, umap_n_neighbors: int = 15,
-        umap_min_dist: float = 0.05, umap_metric: str = "cosine", base_folder: str = "facebook-gnn-47451063") -> None:
+        umap_min_dist: float = 0.05, umap_metric: str = "cosine", base_folder: str = "GNN-47451063") -> None:
     """
     Generate and save UMAP plot of node embeddings.
 
@@ -267,7 +267,7 @@ def build_umap(
     plt.savefig(os.path.join(plots_folder, f"{model_name}_UMAP_PLOT.png"), dpi=200)
     plt.close()
 
-def build_curves(model_name: str, history: Dict[str, List[float]], base_folder: str = "facebook-gnn-47451063") -> None:
+def build_curves(model_name: str, history: Dict[str, List[float]], base_folder: str = "GNN-47451063") -> None:
     """
     Plot and save training/validation curves for loss and accuracy.
 
@@ -307,7 +307,7 @@ def build_curves(model_name: str, history: Dict[str, List[float]], base_folder: 
     plt.savefig(os.path.join(plots_folder, f"{model_name}_ACCURACY_PLOT.png"), dpi=200)
     plt.close()
 
-def save_model(model: nn.Module, model_name: str, base_folder: str = "facebook-gnn-47451063") -> None:
+def save_model(model: nn.Module, model_name: str, base_folder: str = "GNN-47451063") -> None:
     """
     Save a trained model to the specified folder inside the project.
 
@@ -329,7 +329,7 @@ def run_model(
         edges_path: str, target_path: str, features_path: str, svd_components: int = 256, seed: int = 42, device=None,
         max_umap_points: int = 8000, max_tsne_points: int = 8000, tsne_perplexity: int = 30, umap_n_neighbors: int = 15,
         tsne_iterations: int = 1000, umap_min_dist: float = 0.05, umap_metric: str = "cosine", 
-        base_folder: str = "facebook-gnn-47451063") -> None:
+        base_folder: str = "GNN-47451063") -> None:
     """
     Run training, evaluation, and visualisation for multiple GNN models.
 
