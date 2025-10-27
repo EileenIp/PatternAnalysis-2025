@@ -139,12 +139,15 @@ def evaluate(model: nn.Module, data, test_indices, device=None) -> float:
 
     model, data = model.to(device), data.to(device)
     test_indices = test_indices.to(device)
-
+    
+    # Evaluation step
     model.eval()
     with torch.no_grad():
+        # Get logits and label mask
         logits = model(data)
         test_label_mask = data.y[test_indices] >= 0
         
+        # Return no test accuracy if no labeled test nodes
         if test_label_mask.sum() == 0:
             return float("nan")
 
@@ -196,7 +199,7 @@ def build_tsne(
     embeddings = embeddings[labeled_mask]
     labels = labels[labeled_mask]
 
-    # Bulid and fit t-SNE
+    # Build and fit t-SNE
     built_tsne = TSNE(n_components=n_components, random_state=seed, perplexity=perplexity, n_iter=n_iter, init=init, 
                 learning_rate=learning_rate)
     tsne_plot = built_tsne.fit_transform(embeddings)
@@ -209,6 +212,7 @@ def build_tsne(
     plt.ylabel("t-SNE-2")
     plt.tight_layout()
     plt.savefig(os.path.join(plots_folder, f"{model_name}_TSNE_PLOT.png"), dpi=200)
+    plt.close()
 
 def build_umap(
         model_name: str, model: nn.Module, data, max_points: int = 8000, seed: int = 42, umap_n_neighbors: int = 15,
@@ -237,7 +241,7 @@ def build_umap(
         embeddings = model.embed(data).detach().cpu().numpy()
         labels = data.y.detach().cpu().numpy()
 
-    # Subsample if necessary
+    # Subsample if there are too many nodes
     num_nodes = embeddings.shape[0]
     if max_points and num_nodes > max_points:
         sample_indices = np.random.default_rng(seed).choice(num_nodes, size=max_points, replace=False)
@@ -261,7 +265,7 @@ def build_umap(
     plt.ylabel("UMAP-2")
     plt.tight_layout()
     plt.savefig(os.path.join(plots_folder, f"{model_name}_UMAP_PLOT.png"), dpi=200)
-
+    plt.close()
 
 def build_curves(model_name: str, history: Dict[str, List[float]], base_folder: str = "facebook-gnn-47451063") -> None:
     """
@@ -275,6 +279,8 @@ def build_curves(model_name: str, history: Dict[str, List[float]], base_folder: 
     # Create plots folder if it doesn't exist
     plots_folder = os.path.join(base_folder, "plots")
     os.makedirs(plots_folder, exist_ok=True)
+
+    # Create epochs axis
     epochs_axis = np.arange(1, len(history["train_loss"]) + 1)
 
     # Plot and save training curves for train and validation loss
@@ -299,6 +305,7 @@ def build_curves(model_name: str, history: Dict[str, List[float]], base_folder: 
     plt.legend()
     plt.tight_layout()
     plt.savefig(os.path.join(plots_folder, f"{model_name}_ACCURACY_PLOT.png"), dpi=200)
+    plt.close()
 
 def save_model(model: nn.Module, model_name: str, base_folder: str = "facebook-gnn-47451063") -> None:
     """
@@ -345,7 +352,7 @@ def run_model(
     # Load data
     data, train_indices, val_indices, test_indices, num_classes = dataloader(edges_path, target_path, features_path,
                                                                              svd_components=svd_components, seed=seed)
-
+    
     input_dim = data.x.size(1)
     output_dim = num_classes
 
@@ -364,7 +371,7 @@ def run_model(
         # Train and get best model
         model = model_factory()
         model, history = train(model=model, data=data, train_indices=train_indices, val_indices=val_indices,
-                               learning_rate=hyperparams.get("learning_rate", 0.01), weight_decay=5e-4, epochs=300,
+                               learning_rate=hyperparams.get("learning_rate", 0.01), weight_decay=0.0005, epochs=300,
                                scheduler_step_size=50, scheduler_gamma=0.5, device=device, patience=80)
 
         # Evaluate the model
@@ -381,7 +388,7 @@ def run_model(
         build_umap(model_name=model_name, model=model, data=data, max_points=max_umap_points, 
                    umap_n_neighbors=umap_n_neighbors, umap_min_dist=umap_min_dist, umap_metric=umap_metric, seed=seed,
                    base_folder=base_folder)
-        build_curves(model_name, history, base_folder=base_folder)
+        build_curves(model_name=model_name, history=history, base_folder=base_folder)
 
         # Save the trained model
         save_model(model=model, model_name=model_name, base_folder=base_folder)

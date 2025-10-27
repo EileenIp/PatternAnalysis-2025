@@ -4,7 +4,7 @@ from pathlib import Path
 
 # Configure file paths
 project_root = Path(__file__).resolve().parents[1]
-data_dir = project_root / "data"
+data_dir = project_root / "facebook-gnn-47451063/data"
 edges_csv = data_dir / "musae_facebook_edges.csv"
 target_csv = data_dir / "musae_facebook_target.csv"
 feats_json = data_dir / "musae_facebook_features.json"

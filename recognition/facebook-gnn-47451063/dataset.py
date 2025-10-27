@@ -36,7 +36,7 @@ def collect_node_ids(
         edges_dataframe: pd.DataFrame, targets_dataframe: pd.DataFrame,
         features_map: Dict[str, Iterable[int]]) -> Tuple[List[int], Dict[int, int]]:
     """
-    Collect all unique node IDs from edges, targets, and features, and create a mapping to adjacent indices.
+    Collect all unique node IDs from edges, targets, and features, and create a mapping to contiguous indices.
 
     Args:
         edges_dataframe (pd.DataFrame): DataFrame containing edge data.
@@ -44,7 +44,7 @@ def collect_node_ids(
         features_map (Dict[str, Iterable[int]]): Dictionary mapping node IDs to their feature indices.
 
     Returns:
-        Tuple[List[int], Dict[int, int]]: A sorted list of all unique node IDs and a mapping from node ID to adjacent index.
+        Tuple[List[int], Dict[int, int]]: A sorted list of all unique node IDs and a mapping from node ID to contiguous index.
     """
     # Extract node IDs from edges, targets, and features
     node_ids_from_edges = pd.unique(pd.concat([edges_dataframe.iloc[:, 0], edges_dataframe.iloc[:, 1]], axis=0))
@@ -63,7 +63,7 @@ def build_edge_index(edges_dataframe: pd.DataFrame, node_id_to_index: Dict[int, 
 
     Args:
         edges_dataframe (pd.DataFrame): DataFrame containing edge data.
-        node_id_to_index (Dict[int, int]): Dictionary mapping from node ID to adjacent index.
+        node_id_to_index (Dict[int, int]): Dictionary mapping from node ID to contiguous index.
 
     Returns:
         Tesnor: Edge index tensor.
@@ -99,7 +99,7 @@ def build_labels(targets_dataframe: pd.DataFrame, node_id_to_index: Dict[int, in
 
     Args:
         targets_dataframe (pd.DataFrame): DataFrame containing target labels.
-        node_id_to_index (Dict[int, int]): Dictionary mapping from node ID to adjacent index.
+        node_id_to_index (Dict[int, int]): Dictionary mapping from node ID to contiguous index.
         num_nodes (int): Total number of nodes.
 
     Returns:
