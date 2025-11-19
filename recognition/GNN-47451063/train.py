@@ -1,4 +1,6 @@
 # Import Libraries
+import matplotlib
+matplotlib.use("Agg") 
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -163,7 +165,7 @@ def build_tsne(
         base_folder: str = "GNN-47451063") -> None:
     """
     Generate and save t-SNE plot of node embeddings.
-
+  
     Args:
         model_name (str): Name of the model.
         model (nn.Module): The trained GNN model.
@@ -312,11 +314,10 @@ def create_model(model_name: str, input_dim: int, output_dim: int, params: Dict[
     Create a GNN model based on the specified architecture and parameters.
 
     Args:
-        model_name (str): Name of the model architecture ("GCN", "GAT",
-            or "SAGE").
+        model_name (str): Name of the model architecture ("GCN", "GAT", or "SAGE").
         input_dim (int): Dimension of input features.
         output_dim (int): Dimension of output layer.
-        params (Dict[str, Any]): Model hyperparameters.
+        params (Dict[str, Any]): Model parameters.
 
     Returns:
         nn.Module: The constructed GNN model.
@@ -386,7 +387,7 @@ def run_model(
 
     # Default model parameters if none are provided
     if model_parameters is None:
-        model_hyperparameters = {
+        model_parameters = {
             "GCN": {
                 "hidden_dim": 64,
                 "dropout": 0.6,
@@ -427,7 +428,7 @@ def run_model(
     trained_models: Dict[str, nn.Module] = {}
     histories: Dict[str, Dict[str, List[float]]] = {}
 
-    for model_name, params in model_hyperparameters.items():
+    for model_name, params in model_parameters.items():
         # Overwrite input dimension and output dimension for each model
         model_input_dim = params.get("input_dim", default_input_dim)
         if model_input_dim is None:
