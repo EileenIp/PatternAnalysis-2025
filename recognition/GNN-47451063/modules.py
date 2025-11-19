@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from torch_geometric.nn import GCNConv, GATConv, SAGEConv
 
 class GCN(nn.Module):
-    def __init__(self, input_dim, hidden_dim, output_dim, dropout=0.6):
+    def __init__(self, input_dim=256, hidden_dim=64, output_dim=4, dropout=0.6):
         """
         Initialise the GCN model.
         
@@ -56,7 +56,7 @@ class GCN(nn.Module):
         return F.relu(self.conv1(x, edge_index))
 
 class GAT(nn.Module):
-    def __init__(self, input_dim, hidden_dim, output_dim, dropout=0.6, heads=8):
+    def __init__(self, input_dim=256, hidden_dim=64, output_dim=4, dropout=0.6, heads=8):
         """
         Initialise the GAT model.
 
@@ -109,7 +109,7 @@ class GAT(nn.Module):
         return F.elu(self.conv1(x, edge_index))
     
 class SAGE(nn.Module):
-    def __init__(self, input_dim, hidden_dim, output_dim, dropout=0.6):
+    def __init__(self, input_dim=256, hidden_dim=64, output_dim=4, dropout=0.6):
         """
         Initialise the SAGE model.
 
