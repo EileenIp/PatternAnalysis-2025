@@ -10,7 +10,7 @@ from sklearn.manifold import TSNE
 from sklearn.metrics import accuracy_score
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import StepLR
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional, Any
 
 import os
 from datetime import datetime
@@ -307,6 +307,33 @@ def build_curves(model_name: str, history: Dict[str, List[float]], base_folder: 
     plt.savefig(os.path.join(plots_folder, f"{model_name}_ACCURACY_PLOT.png"), dpi=200)
     plt.close()
 
+def create_model(model_name: str, input_dim: int, output_dim: int, params: Dict[str, Any]) -> nn.Module:
+    """
+    Create a GNN model based on the specified architecture and parameters.
+
+    Args:
+        model_name (str): Name of the model architecture ("GCN", "GAT",
+            or "SAGE").
+        input_dim (int): Dimension of input features.
+        output_dim (int): Dimension of output layer.
+        params (Dict[str, Any]): Model hyperparameters.
+
+    Returns:
+        nn.Module: The constructed GNN model.
+    """
+    hidden_dim = params.get("hidden_dim", 64)
+    dropout = params.get("dropout", 0.6)
+
+    if model_name == "GCN":
+        return GCN(input_dim, hidden_dim, output_dim, dropout=dropout)
+    elif model_name == "GAT":
+        heads = params.get("heads", 8)
+        return GAT(input_dim, hidden_dim, output_dim, dropout=dropout, heads=heads)
+    elif model_name == "SAGE":
+        return SAGE(input_dim, hidden_dim, output_dim, dropout=dropout)
+    else:
+        raise ValueError(f"Unknown model name: {model_name}")
+
 def save_model(model: nn.Module, model_name: str, base_folder: str = "GNN-47451063") -> None:
     """
     Save a trained model to the specified folder inside the project.
@@ -329,7 +356,7 @@ def run_model(
         edges_path: str, target_path: str, features_path: str, svd_components: int = 256, seed: int = 42, device=None,
         max_umap_points: int = 8000, max_tsne_points: int = 8000, tsne_perplexity: int = 30, umap_n_neighbors: int = 15,
         tsne_iterations: int = 1000, umap_min_dist: float = 0.05, umap_metric: str = "cosine", 
-        base_folder: str = "GNN-47451063") -> None:
+        base_folder: str = "GNN-47451063", model_parameters: Optional[Dict[str, Dict[str, Any]]] = None,) -> None:
     """
     Run training, evaluation, and visualisation for multiple GNN models.
 
@@ -346,6 +373,7 @@ def run_model(
         tsne_iterations (int): Number of iterations for t-SNE.
         umap_min_dist (float): Minimum distance parameter for UMAP.
         umap_metric (str): Metric for UMAP.
+        model_parameters (dict): Adjustable model parameters. If None, default configured values are used.
     """
     torch.manual_seed(seed)
 
@@ -353,26 +381,80 @@ def run_model(
     data, train_indices, val_indices, test_indices, num_classes = dataloader(edges_path, target_path, features_path,
                                                                              svd_components=svd_components, seed=seed)
     
-    input_dim = data.x.size(1)
-    output_dim = num_classes
+    default_input_dim = data.x.size(1)
+    default_output_dim = num_classes
 
-    # The models selected to train
-    model_configs = [
-        ("GCN", lambda: GCN(input_dim, 64, output_dim, dropout=0.6), dict(learning_rate=0.01)),
-        ("GAT", lambda: GAT(input_dim, 64, output_dim, dropout=0.6, heads=8), dict(learning_rate=0.005)),
-        ("SAGE", lambda: SAGE(input_dim, 64, output_dim, dropout=0.6), dict(learning_rate=0.01)),
-    ]
+    # Default model parameters if none are provided
+    if model_parameters is None:
+        model_hyperparameters = {
+            "GCN": {
+                "hidden_dim": 64,
+                "dropout": 0.6,
+                "learning_rate": 0.01,
+                "weight_decay": 5e-4,
+                "epochs": 300,
+                "scheduler_step_size": 50,
+                "scheduler_gamma": 0.5,
+                "grad_clip_max_norm": 2.0,
+                "patience": 80,
+            },
+            "GAT": {
+                "hidden_dim": 64,
+                "dropout": 0.6,
+                "heads": 8,
+                "learning_rate": 0.005,
+                "weight_decay": 5e-4,
+                "epochs": 300,
+                "scheduler_step_size": 50,
+                "scheduler_gamma": 0.5,
+                "grad_clip_max_norm": 2.0,
+                "patience": 80,
+            },
+            "SAGE": {
+                "hidden_dim": 64,
+                "dropout": 0.6,
+                "learning_rate": 0.01,
+                "weight_decay": 5e-4,
+                "epochs": 300,
+                "scheduler_step_size": 50,
+                "scheduler_gamma": 0.5,
+                "grad_clip_max_norm": 2.0,
+                "patience": 80,
+            },
+        }
 
     results: Dict[str, float] = {}
     trained_models: Dict[str, nn.Module] = {}
     histories: Dict[str, Dict[str, List[float]]] = {}
 
-    for model_name, model_factory, hyperparams in model_configs:
+    for model_name, params in model_hyperparameters.items():
+        # Overwrite input dimension and output dimension for each model
+        model_input_dim = params.get("input_dim", default_input_dim)
+        if model_input_dim is None:
+            model_input_dim = default_input_dim
+
+        model_output_dim = params.get("output_dim", default_output_dim)
+        if model_output_dim is None:
+            model_output_dim = default_output_dim
+
+        # Construct the model for this configuration
+        model = create_model(model_name, model_input_dim, model_output_dim, params)
+
         # Train and get best model
-        model = model_factory()
-        model, history = train(model=model, data=data, train_indices=train_indices, val_indices=val_indices,
-                               learning_rate=hyperparams.get("learning_rate", 0.01), weight_decay=0.0005, epochs=300,
-                               scheduler_step_size=50, scheduler_gamma=0.5, device=device, patience=80)
+        model, history = train(
+            model=model,
+            data=data,
+            train_indices=train_indices,
+            val_indices=val_indices,
+            learning_rate=params.get("learning_rate", 0.01),
+            weight_decay=params.get("weight_decay", 5e-4),
+            epochs=params.get("epochs", 300),
+            scheduler_step_size=params.get("scheduler_step_size", 50),
+            scheduler_gamma=params.get("scheduler_gamma", 0.5),
+            device=device,
+            grad_clip_max_norm=params.get("grad_clip_max_norm", 2.0),
+            patience=params.get("patience", 80),
+        )
 
         # Evaluate the model
         test_accuracy = evaluate(model, data, test_indices)
@@ -380,14 +462,30 @@ def run_model(
         trained_models[model_name] = model
         histories[model_name] = history
 
-        print(f"{model_name}'s Test Accuracy: {test_accuracy*100:.3f}%")
+        print(f"{model_name}'s Test Accuracy: {test_accuracy * 100:.3f}%")
 
         # Visualise results
-        build_tsne(model_name=model_name, model=model, data=data, max_points=max_tsne_points, perplexity=tsne_perplexity,
-                  n_iter=tsne_iterations, seed=seed, base_folder=base_folder)
-        build_umap(model_name=model_name, model=model, data=data, max_points=max_umap_points, 
-                   umap_n_neighbors=umap_n_neighbors, umap_min_dist=umap_min_dist, umap_metric=umap_metric, seed=seed,
-                   base_folder=base_folder)
+        build_tsne(
+            model_name=model_name,
+            model=model,
+            data=data,
+            max_points=max_tsne_points,
+            perplexity=tsne_perplexity,
+            n_iter=tsne_iterations,
+            seed=seed,
+            base_folder=base_folder,
+        )
+        build_umap(
+            model_name=model_name,
+            model=model,
+            data=data,
+            max_points=max_umap_points,
+            umap_n_neighbors=umap_n_neighbors,
+            umap_min_dist=umap_min_dist,
+            umap_metric=umap_metric,
+            seed=seed,
+            base_folder=base_folder,
+        )
         build_curves(model_name=model_name, history=history, base_folder=base_folder)
 
         # Save the trained model
