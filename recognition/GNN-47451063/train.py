@@ -1,3 +1,15 @@
+"""
+File: train.py
+Author: Eileen Ip (47451063)
+Course: COMP3710 
+Project: Semi Supervised Multi-Class Node Classification on Facebook Page-Page Network Dataset
+
+Description:
+    Performs training, evaluation, visualisation for the GNN models (GCN, GAT, SAGE). Includes early-stopping 
+    training loop, test data evaluation, t-SNE/UMAP visualisations, training curves plotting, model creation, 
+    model saving, and a run model functions.
+"""
+
 # Import Libraries
 import matplotlib
 matplotlib.use("Agg") 
