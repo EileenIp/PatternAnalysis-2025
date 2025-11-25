@@ -1,3 +1,15 @@
+"""
+File: predict.py
+Author: Eileen Ip (47451063)
+Course: COMP3710 
+Project: Semi Supervised Multi-Class Node Classification on Facebook Page-Page Network Dataset
+
+Description:
+    Script for running the entire project. Configures dataset paths and model parameters, then calls 
+    the run_model function to train, evaluate, visualise and save GCN, GAT, and SAGE models on the
+    Facebook Page-Page network dataset.
+"""
+
 # Import Libraries
 from train import run_model
 from pathlib import Path
