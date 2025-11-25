@@ -1,3 +1,15 @@
+"""
+File: dataset.py
+Author: Eileen Ip (47451063)
+Course: COMP3710 
+Project: Semi Supervised Multi-Class Node Classification on Facebook Page-Page Network Dataset
+
+Description:
+    Data loading and preprocessing function for the Facebook Page-Page network dataset. Builds edges, labels,
+    and features tensor (added TF-IDF weights and dimensionality reduction with SVD) and returns a Data object, 
+    train/val/test splits and number of classes.
+"""
+
 # Import Libraries
 import json
 import numpy as np
