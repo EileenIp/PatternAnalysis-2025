@@ -1,3 +1,14 @@
+"""
+File: modules.py
+Author: Eileen Ip (47451063)
+Course: COMP3710 
+Project: Semi Supervised Multi-Class Node Classification on Facebook Page-Page Network Dataset
+
+Description:
+    Definition of graph neural network architectures used in the project: GCN, GAT, and SAGE. Each model uses 
+    both a forward pass for node classification and an embed method to obtain node embeddings for visualisation.
+"""
+
 # Import Libraries
 import torch
 import torch.nn as nn
